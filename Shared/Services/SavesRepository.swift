@@ -113,6 +113,29 @@ struct SavesRepository {
         )
     }
 
+    /// Other users' public video links for the same place — anonymized by a
+    /// security-definer function; no saver identity crosses the boundary.
+    func communityVideos(placeId: UUID) async throws -> [CommunityVideo] {
+        try await client
+            .rpc("videos_for_place", params: ["p_place_id": placeId])
+            .execute()
+            .value
+    }
+
+    /// Web search for more videos about a place (spends API budget — call on
+    /// explicit user action only).
+    func webVideos(for place: Place) async throws -> [WebVideo] {
+        let query = ([place.name, place.city, place.country] as [String?])
+            .compactMap { $0 }
+            .filter { !$0.isEmpty }
+            .joined(separator: ", ")
+        let response: WebVideosResponse = try await client.functions.invoke(
+            "discover-videos",
+            options: FunctionInvokeOptions(body: ["place": query])
+        )
+        return response.videos
+    }
+
     /// Kicks off the ingest pipeline: the edge function creates the row,
     /// resolves the link's metadata, classifies it, extracts places, geocodes
     /// them, and files the save into the best-matching list.
@@ -191,4 +214,33 @@ struct AskResponse: Codable {
         case answer
         case saveIds = "save_ids"
     }
+}
+
+struct CommunityVideo: Codable, Identifiable, Hashable {
+    let title: String?
+    let thumbnailUrl: String?
+    let sourceUrl: String
+    let sourcePlatform: String
+
+    var id: String { sourceUrl }
+
+    enum CodingKeys: String, CodingKey {
+        case title
+        case thumbnailUrl = "thumbnail_url"
+        case sourceUrl = "source_url"
+        case sourcePlatform = "source_platform"
+    }
+}
+
+struct WebVideo: Codable, Identifiable, Hashable {
+    let title: String
+    let url: String
+    let platform: String
+    let description: String?
+
+    var id: String { url }
+}
+
+struct WebVideosResponse: Codable {
+    let videos: [WebVideo]
 }

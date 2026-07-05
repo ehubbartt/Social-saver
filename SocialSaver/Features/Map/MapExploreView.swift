@@ -64,6 +64,11 @@ struct PlaceSheetView: View {
                             Label("Call", systemImage: "phone")
                         }
                     }
+                    NavigationLink {
+                        PlaceVideosView(place: pin.place)
+                    } label: {
+                        Label("More videos about this place", systemImage: "play.square.stack")
+                    }
                 }
                 Section("Saved from") {
                     ForEach(pin.saves) { save in

@@ -48,6 +48,7 @@ Share Extension ──► Edge Function: process-save
 | Bulk organize | ❌ (requested, missing) | ✅ multi-select → add to list / delete |
 | Fix a wrong location | ❌ | ✅ replace via Apple Maps search |
 | Share a list | ✅ (requires accounts) | ✅ text export via share sheet |
+| Other videos about a place | ✅ | ✅ community (anonymized) **+ web search** |
 | Trip planning | ➖ (map only) | ✅ **trips with day-by-day itineraries + AI auto-plan** |
 | Social layer (friends, blends) | ✅ | ➖ future (schema supports it) |
 
@@ -105,6 +106,7 @@ destination, vacation dates) and build each day's schedule:
    supabase functions deploy ask-saves
    supabase functions deploy plan-trip
    supabase functions deploy trip-agent
+   supabase functions deploy discover-videos
    supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
    ```
 4. In Authentication settings, enable Email sign-in (email confirmation
@@ -148,6 +150,23 @@ video downloads rely on unofficial endpoints and don't fit in an edge
 function's runtime or limits. The extraction schema and prompt are already
 written so that adding "frames + transcript" to the same Claude call is the
 only change needed if you stand up such a worker later.
+
+### Discover more videos about a place
+
+From any place (map pin sheet or a save's place card → "More videos") you can
+browse other videos about that spot from two sources:
+
+- **From the community** — because places are globally deduplicated, other
+  users' saves of the same spot can be surfaced. Only the public video link,
+  title, and thumbnail are shared, via a security-definer function — never
+  who saved it, their notes, or their lists. Saves themselves stay fully
+  private under RLS.
+- **From the web** — an on-demand web search (explicit button, since it
+  spends API budget) finds TikTok/Reels/YouTube videos about the place, with
+  the same real-URLs-only rule as the rest of the pipeline.
+
+Any discovered video has a save button that runs it through the normal
+ingest pipeline, making it a first-class save of your own.
 
 ## Notes & limitations
 

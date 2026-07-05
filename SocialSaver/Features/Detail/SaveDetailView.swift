@@ -10,6 +10,7 @@ struct SaveDetailView: View {
     @State private var lists: [SavedList] = []
     @State private var confirmation: String?
     @State private var showingEdit = false
+    @State private var placeForVideos: Place?
 
     private let listsRepository = ListsRepository()
     private let savesRepository = SavesRepository()
@@ -114,6 +115,11 @@ struct SaveDetailView: View {
         .task {
             lists = (try? await listsRepository.fetchLists()) ?? []
         }
+        .sheet(item: $placeForVideos) { place in
+            NavigationStack {
+                PlaceVideosView(place: place)
+            }
+        }
         .sheet(isPresented: $showingEdit, onDismiss: {
             // Place edits apply immediately inside the sheet, so refresh even
             // when the user cancels instead of tapping Save.
@@ -188,29 +194,31 @@ struct SaveDetailView: View {
         .padding(.vertical, 4)
     }
 
-    @ViewBuilder
     private func contactButtons(for place: Place) -> some View {
-        if place.websiteURL != nil || place.phoneURL != nil {
-            HStack(spacing: 12) {
-                if let website = place.websiteURL {
-                    Button {
-                        openURL(website)
-                    } label: {
-                        Label("Website", systemImage: "globe")
-                    }
-                }
-                if let phone = place.phoneURL {
-                    Button {
-                        openURL(phone)
-                    } label: {
-                        Label("Call", systemImage: "phone")
-                    }
+        HStack(spacing: 12) {
+            if let website = place.websiteURL {
+                Button {
+                    openURL(website)
+                } label: {
+                    Label("Website", systemImage: "globe")
                 }
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .font(.footnote)
+            if let phone = place.phoneURL {
+                Button {
+                    openURL(phone)
+                } label: {
+                    Label("Call", systemImage: "phone")
+                }
+            }
+            Button {
+                placeForVideos = place
+            } label: {
+                Label("More videos", systemImage: "play.square.stack")
+            }
         }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .font(.footnote)
     }
 
     private func linkRow(_ link: SaveLink) -> some View {
