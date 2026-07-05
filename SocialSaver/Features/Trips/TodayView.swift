@@ -10,7 +10,6 @@ struct TodayView: View {
     @State private var plan: DayPlan?
     @State private var isLoading = true
     @State private var showingRoute = false
-    @State private var allItems: [TripItem] = []
 
     private let repository = TripsRepository()
     private let weatherService = WeatherService()
@@ -146,7 +145,6 @@ struct TodayView: View {
         defer { isLoading = false }
         guard let date = trip.date(forDay: day) else { return }
         let items = (try? await repository.fetchItems(tripId: trip.id)) ?? []
-        allItems = items
         let stops = BriefingPlanner.sortedStops(items.filter { $0.dayIndex == day })
         guard !stops.isEmpty else {
             plan = nil
@@ -166,7 +164,7 @@ struct TodayView: View {
 
         let travel = await BriefingPlanner.travelTime(
             from: BriefingPlanner.hotel(in: items),
-            to: stops.first { $0.timeComponents != nil && $0.coordinate != nil }
+            to: stops.first { $0.timeComponents != nil }
         )
         plan = DayPlan(trip: trip, day: day, date: date, stops: stops, weather: weather, travelTime: travel)
     }

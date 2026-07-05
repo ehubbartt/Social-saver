@@ -222,10 +222,14 @@ struct Trip: Codable, Identifiable, Hashable {
         case createdAt = "created_at"
     }
 
+    // Local timezone on purpose: "yyyy-MM-dd" strings map to local-midnight
+    // Dates so that all day math via Calendar.current (day headers, the
+    // Today card, notification fire times) lands on the right calendar day.
+    // With UTC here, users west of UTC would get briefings a day early.
     static let dayFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
-        formatter.timeZone = TimeZone(identifier: "UTC")
+        formatter.timeZone = .current
         return formatter
     }()
 

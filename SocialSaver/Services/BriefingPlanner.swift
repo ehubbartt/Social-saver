@@ -10,14 +10,17 @@ enum BriefingSettings {
     static let prepMinutesKey = "briefings.prepMinutes"
     static let eveningPreviewKey = "briefings.eveningPreview"
 
+    // Distinguish "never set" from a legitimate 0 (e.g. a midnight briefing).
     static var minutesFromMidnight: Int {
-        let stored = UserDefaults.standard.integer(forKey: minutesFromMidnightKey)
-        return stored == 0 ? 450 : stored // default 07:30
+        let defaults = UserDefaults.standard
+        guard defaults.object(forKey: minutesFromMidnightKey) != nil else { return 450 } // 07:30
+        return defaults.integer(forKey: minutesFromMidnightKey)
     }
 
     static var prepMinutes: Int {
-        let stored = UserDefaults.standard.integer(forKey: prepMinutesKey)
-        return stored == 0 ? 60 : stored
+        let defaults = UserDefaults.standard
+        guard defaults.object(forKey: prepMinutesKey) != nil else { return 60 }
+        return defaults.integer(forKey: prepMinutesKey)
     }
 }
 
@@ -133,11 +136,19 @@ final class BriefingScheduler {
     private let repository = TripsRepository()
     private let weatherService = WeatherService()
     private var isRefreshing = false
+    private var lastRefresh: Date?
 
-    func refresh() async {
+    /// `force` skips the throttle — used when settings change.
+    func refresh(force: Bool = false) async {
         guard !isRefreshing else { return }
+        // The sweep hits weather + directions APIs, so don't re-run it on
+        // every Trips tab appearance.
+        if !force, let lastRefresh, Date.now.timeIntervalSince(lastRefresh) < 900 { return }
         isRefreshing = true
-        defer { isRefreshing = false }
+        defer {
+            isRefreshing = false
+            lastRefresh = .now
+        }
 
         let center = UNUserNotificationCenter.current()
         let pending = await center.pendingNotificationRequests()
@@ -177,9 +188,11 @@ final class BriefingScheduler {
                 let stops = BriefingPlanner.sortedStops(items.filter { $0.dayIndex == day })
                 guard !stops.isEmpty else { continue }
 
+                // Same stop the leave-by arrival uses; travelTime returns nil
+                // if it has no coordinates and wake-up falls back cleanly.
                 let travel = await BriefingPlanner.travelTime(
                     from: hotel,
-                    to: stops.first { $0.timeComponents != nil && $0.coordinate != nil }
+                    to: stops.first { $0.timeComponents != nil }
                 )
                 let plan = DayPlan(
                     trip: trip,

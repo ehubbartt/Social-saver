@@ -60,6 +60,6 @@ struct NotificationSettingsView: View {
     }
 
     private func rescheduleBriefings() {
-        Task { await BriefingScheduler.shared.refresh() }
+        Task { await BriefingScheduler.shared.refresh(force: true) }
     }
 }

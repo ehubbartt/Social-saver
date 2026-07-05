@@ -101,12 +101,18 @@ struct WeatherService {
             guard index < payload.daily.weather_code.count,
                   index < payload.daily.temperature_2m_max.count,
                   index < payload.daily.temperature_2m_min.count else { continue }
+            let precip: Int?
+            if let probabilities = payload.daily.precipitation_probability_max, index < probabilities.count {
+                precip = probabilities[index]
+            } else {
+                precip = nil
+            }
             result[date] = DayWeather(
                 date: date,
                 code: payload.daily.weather_code[index],
                 tempMax: payload.daily.temperature_2m_max[index],
                 tempMin: payload.daily.temperature_2m_min[index],
-                precipProbability: payload.daily.precipitation_probability_max?[index] ?? nil
+                precipProbability: precip
             )
         }
         return result
