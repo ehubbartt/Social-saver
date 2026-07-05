@@ -96,9 +96,9 @@ struct SaveDetailView: View {
         .navigationTitle(save.title ?? "Save")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    if isMine {
+            if isMine {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
                         Button {
                             showingEdit = true
                         } label: {
@@ -112,9 +112,9 @@ struct SaveDetailView: View {
                                 systemImage: isRecommended ? "hand.thumbsup.fill" : "hand.thumbsup"
                             )
                         }
-                    }
-                    addToListMenu
-                    if isMine {
+                        // Lists hold only your own saves; adding a friend's
+                        // save would dangle if they later unshare it.
+                        addToListMenu
                         Divider()
                         Button(role: .destructive) {
                             Task {
@@ -124,9 +124,9 @@ struct SaveDetailView: View {
                         } label: {
                             Label("Delete save", systemImage: "trash")
                         }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
                     }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
                 }
             }
         }
