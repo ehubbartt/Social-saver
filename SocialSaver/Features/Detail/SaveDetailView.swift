@@ -104,7 +104,7 @@ struct SaveDetailView: View {
                     .padding(10)
                     .background(.thinMaterial, in: Capsule())
                     .padding(.bottom, 16)
-                    .task {
+                    .task(id: confirmation) {
                         try? await Task.sleep(for: .seconds(2))
                         self.confirmation = nil
                     }
@@ -114,7 +114,7 @@ struct SaveDetailView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 8) {
-            AsyncImage(url: save.thumbnailUrl.flatMap(URL.init)) { image in
+            AsyncImage(url: save.thumbnailUrl.flatMap { URL(string: $0) }) { image in
                 image.resizable().aspectRatio(contentMode: .fill)
             } placeholder: {
                 Color(.secondarySystemBackground).frame(height: 200)

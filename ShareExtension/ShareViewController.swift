@@ -38,12 +38,12 @@ final class ShareViewController: UIViewController {
 
         for provider in providers {
             if provider.hasItemConformingToTypeIdentifier(UTType.url.identifier),
-               let item = try? await provider.loadItem(forTypeIdentifier: UTType.url.identifier),
+               let item = try? await provider.loadItem(forTypeIdentifier: UTType.url.identifier, options: nil),
                let url = item as? URL {
                 return url.absoluteString
             }
             if provider.hasItemConformingToTypeIdentifier(UTType.plainText.identifier),
-               let item = try? await provider.loadItem(forTypeIdentifier: UTType.plainText.identifier),
+               let item = try? await provider.loadItem(forTypeIdentifier: UTType.plainText.identifier, options: nil),
                let text = item as? String,
                let url = Self.firstURL(in: text) {
                 return url

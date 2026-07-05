@@ -107,7 +107,7 @@ struct SaveCardView: View {
     }
 
     private var thumbnail: some View {
-        AsyncImage(url: save.thumbnailUrl.flatMap(URL.init)) { image in
+        AsyncImage(url: save.thumbnailUrl.flatMap { URL(string: $0) }) { image in
             image.resizable().aspectRatio(contentMode: .fill)
         } placeholder: {
             ZStack {

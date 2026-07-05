@@ -4,8 +4,9 @@
 // 2. Resolve the link's public metadata (oEmbed for TikTok, OpenGraph otherwise).
 // 3. Download the video's cover frame so the model can SEE the content —
 //    TikTok covers usually carry the place name as a text overlay.
-// 4. Ask Claude (vision + caption) to classify the content, summarize it,
-//    extract places and recipes, and pick the best list for it.
+// 4. Ask Claude (vision + caption + web search) to classify the content,
+//    summarize it, extract places and recipes, find real links and contact
+//    info for everything mentioned, and pick the best list for it.
 // 5. Geocode extracted places via Nominatim and link them to the save.
 // 6. File the save into the chosen list and mark it processed (or failed).
 //
@@ -186,8 +187,10 @@ async function processSave(
       .upsert(
         {
           name: place.name,
-          city: place.city,
-          country: place.country,
+          // '' instead of null so the (name, city, country) unique
+          // constraint actually deduplicates (NULLs never match).
+          city: place.city ?? "",
+          country: place.country ?? "",
           address: geo?.display_name ?? null,
           latitude: geo?.lat ?? null,
           longitude: geo?.lon ?? null,

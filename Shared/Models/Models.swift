@@ -57,12 +57,17 @@ struct Place: Codable, Identifiable, Hashable {
     let website: String?
     let phone: String?
 
+    // City/country are stored as '' rather than NULL (see 0004 migration),
+    // so filter empties before joining.
     var subtitle: String {
-        [city, country].compactMap { $0 }.joined(separator: ", ")
+        [city, country]
+            .compactMap { $0 }
+            .filter { !$0.isEmpty }
+            .joined(separator: ", ")
     }
 
     var websiteURL: URL? {
-        website.flatMap(URL.init)
+        website.flatMap { URL(string: $0) }
     }
 
     var phoneURL: URL? {

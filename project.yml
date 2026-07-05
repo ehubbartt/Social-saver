@@ -17,6 +17,9 @@ targets:
   SocialSaver:
     type: application
     platform: iOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ehubbartt.socialsaver
     sources:
       - SocialSaver
       - Shared
@@ -43,6 +46,10 @@ targets:
   ShareExtension:
     type: app-extension
     platform: iOS
+    settings:
+      base:
+        # Extensions must use a child of the host app's bundle identifier.
+        PRODUCT_BUNDLE_IDENTIFIER: com.ehubbartt.socialsaver.ShareExtension
     sources:
       - ShareExtension
       - Shared
