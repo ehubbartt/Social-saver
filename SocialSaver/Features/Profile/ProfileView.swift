@@ -15,11 +15,11 @@ struct ProfileView: View {
                 }
 
                 Section {
-                    Text("Share a video from TikTok or Instagram, tap the share button, and choose SocialSaver. The save is classified and mapped automatically.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                } header: {
-                    Text("How to save")
+                    NavigationLink {
+                        GuideView()
+                    } label: {
+                        Label("How to save", systemImage: "questionmark.circle")
+                    }
                 }
 
                 Section {

@@ -31,14 +31,15 @@ struct SavesRepository {
 
     /// Manual corrections: the AI pipeline can get titles, summaries, and
     /// categories wrong, so everything it writes is user-editable.
-    func update(id: UUID, title: String?, summary: String?, contentType: ContentType) async throws {
+    func update(id: UUID, title: String?, summary: String?, note: String?, contentType: ContentType) async throws {
         struct Payload: Encodable {
             let title: String?
             let summary: String?
+            let note: String?
             let content_type: String
         }
         try await client.from("saves")
-            .update(Payload(title: title, summary: summary, content_type: contentType.rawValue))
+            .update(Payload(title: title, summary: summary, note: note, content_type: contentType.rawValue))
             .eq("id", value: id)
             .execute()
     }

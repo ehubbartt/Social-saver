@@ -13,6 +13,7 @@ struct EditSaveView: View {
 
     @State private var title: String
     @State private var summary: String
+    @State private var note: String
     @State private var contentType: ContentType
     @State private var places: [Place]
     @State private var placeToReplace: Place?
@@ -27,6 +28,7 @@ struct EditSaveView: View {
         self.onSaved = onSaved
         _title = State(initialValue: save.title ?? "")
         _summary = State(initialValue: save.summary ?? "")
+        _note = State(initialValue: save.note ?? "")
         _contentType = State(initialValue: save.contentType)
         _places = State(initialValue: save.places)
     }
@@ -50,6 +52,11 @@ struct EditSaveView: View {
                 Section("Summary") {
                     TextField("Summary", text: $summary, axis: .vertical)
                         .lineLimit(3...8)
+                }
+
+                Section("My note") {
+                    TextField("e.g. Mia recommended this — book ahead", text: $note, axis: .vertical)
+                        .lineLimit(2...6)
                 }
 
                 Section {
@@ -126,10 +133,12 @@ struct EditSaveView: View {
         do {
             let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
             let trimmedSummary = summary.trimmingCharacters(in: .whitespacesAndNewlines)
+            let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
             try await repository.update(
                 id: save.id,
                 title: trimmedTitle.isEmpty ? nil : trimmedTitle,
                 summary: trimmedSummary.isEmpty ? nil : trimmedSummary,
+                note: trimmedNote.isEmpty ? nil : trimmedNote,
                 contentType: contentType
             )
             await onSaved()

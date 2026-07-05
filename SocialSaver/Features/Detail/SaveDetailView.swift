@@ -32,6 +32,12 @@ struct SaveDetailView: View {
                 }
             }
 
+            if let note = save.note, !note.isEmpty {
+                Section("My note") {
+                    Label(note, systemImage: "note.text")
+                }
+            }
+
             if let recipe = save.recipe {
                 if !recipe.ingredients.isEmpty {
                     Section("Ingredients") {

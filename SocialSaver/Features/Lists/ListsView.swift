@@ -81,14 +81,40 @@ struct ListsView: View {
 struct ListDetailView: View {
     let list: SavedList
     @State private var saves: [Save] = []
+    @State private var searchText = ""
 
     private let repository = ListsRepository()
     private let columns = [GridItem(.adaptive(minimum: 160), spacing: 12)]
 
+    private var filteredSaves: [Save] {
+        let query = searchText.trimmingCharacters(in: .whitespaces)
+        guard !query.isEmpty else { return saves }
+        return saves.filter { save in
+            (save.title?.localizedCaseInsensitiveContains(query) ?? false)
+                || (save.summary?.localizedCaseInsensitiveContains(query) ?? false)
+                || save.places.contains { $0.name.localizedCaseInsensitiveContains(query) }
+        }
+    }
+
+    /// Plain-text export so a list can be sent to friends without accounts.
+    private var exportText: String {
+        var lines = ["\(list.emoji ?? "") \(list.name)".trimmingCharacters(in: .whitespaces)]
+        for save in saves {
+            lines.append("")
+            lines.append("• \(save.title ?? save.sourceUrl)")
+            for place in save.places {
+                let detail = place.subtitle.isEmpty ? "" : " (\(place.subtitle))"
+                lines.append("  📍 \(place.name)\(detail)")
+            }
+            lines.append("  \(save.sourceUrl)")
+        }
+        return lines.joined(separator: "\n")
+    }
+
     var body: some View {
         ScrollView {
             LazyVGrid(columns: columns, spacing: 12) {
-                ForEach(saves) { save in
+                ForEach(filteredSaves) { save in
                     NavigationLink(value: save) {
                         SaveCardView(save: save)
                     }
@@ -105,6 +131,13 @@ struct ListDetailView: View {
             .padding(.horizontal)
         }
         .navigationTitle("\(list.emoji ?? "") \(list.name)")
+        .searchable(text: $searchText, prompt: "Search this list")
+        .toolbar {
+            ShareLink(item: exportText) {
+                Image(systemName: "square.and.arrow.up")
+            }
+            .disabled(saves.isEmpty)
+        }
         .navigationDestination(for: Save.self) { save in
             SaveDetailView(save: save)
         }

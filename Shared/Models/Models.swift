@@ -127,6 +127,7 @@ struct Save: Codable, Identifiable, Hashable {
     let contentType: ContentType
     let status: SaveStatus
     let recipe: Recipe?
+    let note: String?
     let createdAt: Date
     let savePlaces: [SavePlaceJoin]?
     let saveLinks: [SaveLink]?
@@ -146,6 +147,7 @@ struct Save: Codable, Identifiable, Hashable {
         case contentType = "content_type"
         case status
         case recipe
+        case note
         case createdAt = "created_at"
         case savePlaces = "save_places"
         case saveLinks = "save_links"

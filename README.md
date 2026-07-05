@@ -42,8 +42,12 @@ Share Extension ──► Edge Function: process-save
 | Smart list filing | ✅ | ✅ (+ manual add/remove/move) |
 | Links & contact info for mentions | ❌ | ✅ website/phone/App Store/booking |
 | "Chat to Albo" ask assistant | ✅ | ✅ Ask tab (grounded in your saves) |
-| Search within saves | ❌ (top complaint) | ✅ titles, summaries, place names |
+| Notes on items | ✅ | ✅ personal note per save |
+| Import / how-to-save guides | ✅ | ✅ in-app guide (Profile tab) |
+| Search within saves | ❌ (top complaint) | ✅ home grid **and inside lists** |
+| Bulk organize | ❌ (requested, missing) | ✅ multi-select → add to list / delete |
 | Fix a wrong location | ❌ | ✅ replace via Apple Maps search |
+| Share a list | ✅ (requires accounts) | ✅ text export via share sheet |
 | Social layer (friends, blends) | ✅ | ➖ future (schema supports it) |
 
 AI extraction can be wrong, so **everything it writes is editable**: open a

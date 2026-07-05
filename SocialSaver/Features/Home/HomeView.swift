@@ -5,6 +5,11 @@ struct HomeView: View {
     @State private var filter: ContentType?
     @State private var searchText = ""
     @State private var showingAsk = false
+    @State private var isSelecting = false
+    @State private var selection: Set<UUID> = []
+    @State private var lists: [SavedList] = []
+
+    private let listsRepository = ListsRepository()
 
     private var filteredSaves: [Save] {
         var result = store.saves
@@ -16,6 +21,7 @@ struct HomeView: View {
             result = result.filter { save in
                 (save.title?.localizedCaseInsensitiveContains(query) ?? false)
                     || (save.summary?.localizedCaseInsensitiveContains(query) ?? false)
+                    || (save.note?.localizedCaseInsensitiveContains(query) ?? false)
                     || save.places.contains { place in
                         place.name.localizedCaseInsensitiveContains(query)
                             || place.subtitle.localizedCaseInsensitiveContains(query)
@@ -36,10 +42,29 @@ struct HomeView: View {
                 } else {
                     LazyVGrid(columns: columns, spacing: 12) {
                         ForEach(filteredSaves) { save in
-                            NavigationLink(value: save) {
-                                SaveCardView(save: save)
+                            if isSelecting {
+                                Button {
+                                    toggleSelection(save.id)
+                                } label: {
+                                    SaveCardView(save: save)
+                                        .overlay(alignment: .topTrailing) {
+                                            Image(systemName: selection.contains(save.id)
+                                                ? "checkmark.circle.fill"
+                                                : "circle")
+                                                .font(.title3)
+                                                .foregroundStyle(selection.contains(save.id)
+                                                    ? Color.accentColor
+                                                    : Color.secondary)
+                                                .padding(6)
+                                        }
+                                }
+                                .buttonStyle(.plain)
+                            } else {
+                                NavigationLink(value: save) {
+                                    SaveCardView(save: save)
+                                }
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
                         }
                     }
                     .padding(.horizontal)
@@ -48,10 +73,28 @@ struct HomeView: View {
             .navigationTitle("Saves")
             .searchable(text: $searchText, prompt: "Search saves and places")
             .toolbar {
-                Button {
-                    showingAsk = true
-                } label: {
-                    Image(systemName: "sparkles")
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(isSelecting ? "Done" : "Select") {
+                        isSelecting.toggle()
+                        selection.removeAll()
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showingAsk = true
+                    } label: {
+                        Image(systemName: "sparkles")
+                    }
+                }
+            }
+            .safeAreaInset(edge: .bottom) {
+                if isSelecting && !selection.isEmpty {
+                    bulkActionBar
+                }
+            }
+            .task(id: isSelecting) {
+                if isSelecting {
+                    lists = (try? await listsRepository.fetchLists()) ?? []
                 }
             }
             .sheet(isPresented: $showingAsk) {
@@ -96,6 +139,54 @@ struct HomeView: View {
                 .foregroundStyle(isSelected ? .white : .primary)
                 .clipShape(Capsule())
         }
+    }
+
+    private var bulkActionBar: some View {
+        HStack {
+            Menu {
+                ForEach(lists) { list in
+                    Button("\(list.emoji ?? "📁") \(list.name)") {
+                        Task { await bulkAdd(to: list) }
+                    }
+                }
+            } label: {
+                Label("Add \(selection.count) to list", systemImage: "plus.rectangle.on.folder")
+            }
+            .disabled(lists.isEmpty)
+            Spacer()
+            Button(role: .destructive) {
+                Task { await bulkDelete() }
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+        .padding()
+        .background(.bar)
+    }
+
+    private func toggleSelection(_ id: UUID) {
+        if selection.contains(id) {
+            selection.remove(id)
+        } else {
+            selection.insert(id)
+        }
+    }
+
+    private func bulkAdd(to list: SavedList) async {
+        for id in selection {
+            try? await listsRepository.addSave(id, to: list.id)
+        }
+        isSelecting = false
+        selection.removeAll()
+    }
+
+    private func bulkDelete() async {
+        let toDelete = store.saves.filter { selection.contains($0.id) }
+        for save in toDelete {
+            await store.delete(save)
+        }
+        isSelecting = false
+        selection.removeAll()
     }
 
     private var emptyState: some View {
