@@ -6,11 +6,17 @@ struct SaveDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
 
-    let save: Save
+    @State private var save: Save
     @State private var lists: [SavedList] = []
     @State private var confirmation: String?
+    @State private var showingEdit = false
 
     private let listsRepository = ListsRepository()
+    private let savesRepository = SavesRepository()
+
+    init(save: Save) {
+        _save = State(initialValue: save)
+    }
 
     var body: some View {
         List {
@@ -79,6 +85,11 @@ struct SaveDetailView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
+                    Button {
+                        showingEdit = true
+                    } label: {
+                        Label("Edit", systemImage: "pencil")
+                    }
                     addToListMenu
                     Divider()
                     Button(role: .destructive) {
@@ -96,6 +107,11 @@ struct SaveDetailView: View {
         }
         .task {
             lists = (try? await listsRepository.fetchLists()) ?? []
+        }
+        .sheet(isPresented: $showingEdit) {
+            EditSaveView(save: save) {
+                await reload()
+            }
         }
         .overlay(alignment: .bottom) {
             if let confirmation {
@@ -211,6 +227,13 @@ struct SaveDetailView: View {
                     .foregroundStyle(.tertiary)
             }
         }
+    }
+
+    private func reload() async {
+        if let fresh = try? await savesRepository.fetchSave(id: save.id) {
+            save = fresh
+        }
+        await store.refresh()
     }
 
     private struct IngredientLabelStyle: LabelStyle {

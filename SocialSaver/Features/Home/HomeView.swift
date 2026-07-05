@@ -3,10 +3,26 @@ import SwiftUI
 struct HomeView: View {
     @Environment(SavesStore.self) private var store
     @State private var filter: ContentType?
+    @State private var searchText = ""
+    @State private var showingAsk = false
 
     private var filteredSaves: [Save] {
-        guard let filter else { return store.saves }
-        return store.saves.filter { $0.contentType == filter }
+        var result = store.saves
+        if let filter {
+            result = result.filter { $0.contentType == filter }
+        }
+        let query = searchText.trimmingCharacters(in: .whitespaces)
+        if !query.isEmpty {
+            result = result.filter { save in
+                (save.title?.localizedCaseInsensitiveContains(query) ?? false)
+                    || (save.summary?.localizedCaseInsensitiveContains(query) ?? false)
+                    || save.places.contains { place in
+                        place.name.localizedCaseInsensitiveContains(query)
+                            || place.subtitle.localizedCaseInsensitiveContains(query)
+                    }
+            }
+        }
+        return result
     }
 
     private let columns = [GridItem(.adaptive(minimum: 160), spacing: 12)]
@@ -30,6 +46,17 @@ struct HomeView: View {
                 }
             }
             .navigationTitle("Saves")
+            .searchable(text: $searchText, prompt: "Search saves and places")
+            .toolbar {
+                Button {
+                    showingAsk = true
+                } label: {
+                    Image(systemName: "sparkles")
+                }
+            }
+            .sheet(isPresented: $showingAsk) {
+                AskView()
+            }
             .navigationDestination(for: Save.self) { save in
                 SaveDetailView(save: save)
             }

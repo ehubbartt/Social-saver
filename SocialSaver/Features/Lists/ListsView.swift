@@ -93,6 +93,13 @@ struct ListDetailView: View {
                         SaveCardView(save: save)
                     }
                     .buttonStyle(.plain)
+                    .contextMenu {
+                        Button(role: .destructive) {
+                            Task { await remove(save) }
+                        } label: {
+                            Label("Remove from list", systemImage: "folder.badge.minus")
+                        }
+                    }
                 }
             }
             .padding(.horizontal)
@@ -109,5 +116,10 @@ struct ListDetailView: View {
         .task {
             saves = (try? await repository.fetchItems(listId: list.id)) ?? []
         }
+    }
+
+    private func remove(_ save: Save) async {
+        try? await repository.removeSave(save.id, from: list.id)
+        saves.removeAll { $0.id == save.id }
     }
 }

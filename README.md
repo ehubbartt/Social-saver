@@ -31,6 +31,26 @@ Share Extension ──► Edge Function: process-save
         App tabs: Saves grid │ Map │ Lists │ Profile
 ```
 
+## Feature parity with Albo — and its weak points fixed
+
+| | Albo | SocialSaver |
+|---|---|---|
+| Share-sheet saving (TikTok/IG/any URL) | ✅ | ✅ |
+| Auto-categorization | ✅ (no way to fix mistakes) | ✅ **+ fully editable** |
+| Place extraction → map | ✅ (one place per video) | ✅ **multiple places per video** |
+| Recipe extraction | ✅ | ✅ |
+| Smart list filing | ✅ | ✅ (+ manual add/remove/move) |
+| Links & contact info for mentions | ❌ | ✅ website/phone/App Store/booking |
+| "Chat to Albo" ask assistant | ✅ | ✅ Ask tab (grounded in your saves) |
+| Search within saves | ❌ (top complaint) | ✅ titles, summaries, place names |
+| Fix a wrong location | ❌ | ✅ replace via Apple Maps search |
+| Social layer (friends, blends) | ✅ | ➖ future (schema supports it) |
+
+AI extraction can be wrong, so **everything it writes is editable**: open a
+save → ⋯ → Edit to change the title, summary, and category, and to remove,
+replace, or add places. Place corrections go through Apple Maps search, so
+the fixed pin has real coordinates and a real address.
+
 ## Setup
 
 ### 1. Supabase project
@@ -41,9 +61,10 @@ Share Extension ──► Edge Function: process-save
    supabase link --project-ref YOUR_PROJECT_REF
    supabase db push
    ```
-3. Deploy the ingest function and set your Claude API key:
+3. Deploy the edge functions and set your Claude API key:
    ```sh
    supabase functions deploy process-save
+   supabase functions deploy ask-saves
    supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
    ```
 4. In Authentication settings, enable Email sign-in (email confirmation
