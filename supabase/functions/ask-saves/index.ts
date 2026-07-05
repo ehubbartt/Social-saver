@@ -45,13 +45,17 @@ Deno.serve(async (req) => {
     const { data: userData, error: userError } = await supabase.auth.getUser();
     if (userError || !userData.user) return json({ error: "Unauthorized" }, 401);
 
+    // Explicitly the caller's own rows: RLS also exposes friends' shared
+    // saves/lists, which don't belong in "your saves".
+    const userId = userData.user.id;
     const [{ data: saves }, { data: lists }] = await Promise.all([
       supabase
         .from("saves")
         .select("id, title, summary, content_type, source_platform, created_at, save_places(place:places(name, city, country))")
+        .eq("user_id", userId)
         .order("created_at", { ascending: false })
         .limit(200),
-      supabase.from("lists").select("name, emoji, list_items(save_id)"),
+      supabase.from("lists").select("name, emoji, list_items(save_id)").eq("user_id", userId),
     ]);
 
     if (!saves || saves.length === 0) {

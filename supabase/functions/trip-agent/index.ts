@@ -239,6 +239,7 @@ async function buildSystem(supabase: SupabaseClient, trip: Record<string, unknow
     supabase
       .from("saves")
       .select("id, title, summary, content_type, save_places(place:places(name, city, country))")
+      .eq("user_id", trip.user_id)
       .eq("status", "processed")
       .order("created_at", { ascending: false })
       .limit(150),

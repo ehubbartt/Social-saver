@@ -128,13 +128,17 @@ struct Save: Codable, Identifiable, Hashable {
     let contentType: ContentType
     let status: SaveStatus
     let recipe: Recipe?
-    let note: String?
     let createdAt: Date
     let savePlaces: [SavePlaceJoin]?
     let saveLinks: [SaveLink]?
+    let saveNotes: [SaveNoteJoin]?
 
     var places: [Place] { savePlaces?.map(\.place) ?? [] }
     var links: [SaveLink] { saveLinks ?? [] }
+
+    /// Personal note. Lives in save_notes (own row only under RLS), so a
+    /// recommended or shared save never exposes it to friends.
+    var note: String? { saveNotes?.first?.note }
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -148,11 +152,15 @@ struct Save: Codable, Identifiable, Hashable {
         case contentType = "content_type"
         case status
         case recipe
-        case note
         case createdAt = "created_at"
         case savePlaces = "save_places"
         case saveLinks = "save_links"
+        case saveNotes = "save_notes"
     }
+}
+
+struct SaveNoteJoin: Codable, Hashable {
+    let note: String
 }
 
 struct SavePlaceJoin: Codable, Hashable {
@@ -164,13 +172,17 @@ struct SavedList: Codable, Identifiable, Hashable {
     let userId: UUID
     let name: String
     let emoji: String?
+    let visibility: String?
     let createdAt: Date
+
+    var isFriendsVisible: Bool { visibility == "friends" }
 
     enum CodingKeys: String, CodingKey {
         case id
         case userId = "user_id"
         case name
         case emoji
+        case visibility
         case createdAt = "created_at"
     }
 }

@@ -4,12 +4,16 @@ import Supabase
 struct SavesRepository {
     private var client: SupabaseClient { SupabaseClientProvider.shared }
 
-    private static let saveColumns = "*, save_places(place:places(*)), save_links(*)"
+    private static let saveColumns = "*, save_places(place:places(*)), save_links(*), save_notes(note)"
 
+    /// Explicitly "mine": after the sharing rewrite, RLS also exposes saves
+    /// friends recommended or shared, which must not pollute the home grid.
     func fetchSaves() async throws -> [Save] {
-        try await client
+        guard let me = SupabaseClientProvider.currentUserId else { throw AuthError.sessionMissing }
+        return try await client
             .from("saves")
             .select(Self.saveColumns)
+            .eq("user_id", value: me)
             .order("created_at", ascending: false)
             .execute()
             .value
@@ -31,17 +35,38 @@ struct SavesRepository {
 
     /// Manual corrections: the AI pipeline can get titles, summaries, and
     /// categories wrong, so everything it writes is user-editable.
-    func update(id: UUID, title: String?, summary: String?, note: String?, contentType: ContentType) async throws {
+    func update(id: UUID, title: String?, summary: String?, contentType: ContentType) async throws {
         struct Payload: Encodable {
             let title: String?
             let summary: String?
-            let note: String?
             let content_type: String
         }
         try await client.from("saves")
-            .update(Payload(title: title, summary: summary, note: note, content_type: contentType.rawValue))
+            .update(Payload(title: title, summary: summary, content_type: contentType.rawValue))
             .eq("id", value: id)
             .execute()
+    }
+
+    /// Personal note, kept in save_notes so it never crosses the sharing
+    /// boundary. Nil clears it.
+    func setNote(saveId: UUID, note: String?) async throws {
+        guard let me = SupabaseClientProvider.currentUserId else { throw AuthError.sessionMissing }
+        if let note {
+            struct Payload: Encodable {
+                let save_id: UUID
+                let user_id: UUID
+                let note: String
+            }
+            try await client.from("save_notes")
+                .upsert(Payload(save_id: saveId, user_id: me, note: note), onConflict: "save_id,user_id")
+                .execute()
+        } else {
+            try await client.from("save_notes")
+                .delete()
+                .eq("save_id", value: saveId)
+                .eq("user_id", value: me)
+                .execute()
+        }
     }
 
     func removePlace(_ placeId: UUID, from saveId: UUID) async throws {
@@ -150,10 +175,14 @@ struct SavesRepository {
 struct ListsRepository {
     private var client: SupabaseClient { SupabaseClientProvider.shared }
 
+    /// Explicitly "mine" — friends-visible lists from others are reachable
+    /// through the feed, not mixed into the Lists screen or add-to-list menus.
     func fetchLists() async throws -> [SavedList] {
-        try await client
+        guard let me = SupabaseClientProvider.currentUserId else { throw AuthError.sessionMissing }
+        return try await client
             .from("lists")
             .select()
+            .eq("user_id", value: me)
             .order("created_at", ascending: false)
             .execute()
             .value
@@ -162,7 +191,7 @@ struct ListsRepository {
     func fetchItems(listId: UUID) async throws -> [Save] {
         let joins: [ListItemJoin] = try await client
             .from("list_items")
-            .select("save:saves(*, save_places(place:places(*)), save_links(*))")
+            .select("save:saves(*, save_places(place:places(*)), save_links(*), save_notes(note))")
             .eq("list_id", value: listId)
             .execute()
             .value

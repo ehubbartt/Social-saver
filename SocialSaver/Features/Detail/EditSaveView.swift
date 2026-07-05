@@ -138,9 +138,9 @@ struct EditSaveView: View {
                 id: save.id,
                 title: trimmedTitle.isEmpty ? nil : trimmedTitle,
                 summary: trimmedSummary.isEmpty ? nil : trimmedSummary,
-                note: trimmedNote.isEmpty ? nil : trimmedNote,
                 contentType: contentType
             )
+            try await repository.setNote(saveId: save.id, note: trimmedNote.isEmpty ? nil : trimmedNote)
             await onSaved()
             dismiss()
         } catch {

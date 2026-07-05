@@ -11,8 +11,8 @@ struct MainTabView: View {
                 .tabItem { Label("Map", systemImage: "map") }
             TripsView()
                 .tabItem { Label("Trips", systemImage: "airplane") }
-            ListsView()
-                .tabItem { Label("Lists", systemImage: "list.bullet.rectangle") }
+            FeedView()
+                .tabItem { Label("Friends", systemImage: "person.2") }
             ProfileView()
                 .tabItem { Label("Profile", systemImage: "person.circle") }
         }

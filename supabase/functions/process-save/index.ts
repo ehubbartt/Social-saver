@@ -174,8 +174,9 @@ async function processSave(
   // 3. Grab the cover frame so the model can read on-screen text overlays.
   const coverImage = meta.thumbnailUrl ? await fetchImage(meta.thumbnailUrl) : null;
 
-  // 4. Classify + extract with Claude, aware of the user's existing lists.
-  const { data: lists } = await supabase.from("lists").select("id, name, emoji");
+  // 4. Classify + extract with Claude, aware of the user's OWN lists
+  //    (RLS also exposes friends' shared lists, which must not be targets).
+  const { data: lists } = await supabase.from("lists").select("id, name, emoji").eq("user_id", userId);
   const extraction = await extractWithClaude(url, platform, meta, coverImage, lists ?? []);
 
   // 5. Geocode and link places.

@@ -1,5 +1,11 @@
 # Friends & Sharing — Architecture Review
 
+> **Status:** Friends (D1, D2), the feed privacy model, list visibility, the
+> saves-visibility rewrite (D5, including the save_notes move), and the
+> query-audit items (D6, D7) shipped in migrations 0011/0012. Still open:
+> per-member trip/list sharing with viewer/editor roles (D3's member tables
+> and the trip-side policy work), realtime, and push notifications.
+
 Design review for adding friends, shared trips, and shared lists. Written
 before implementation because this feature rewrites the app's security model:
 today every table is single-owner (`user_id = auth.uid()` everywhere), and

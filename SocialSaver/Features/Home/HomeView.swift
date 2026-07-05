@@ -5,6 +5,7 @@ struct HomeView: View {
     @State private var filter: ContentType?
     @State private var searchText = ""
     @State private var showingAsk = false
+    @State private var showingLists = false
     @State private var isSelecting = false
     @State private var selection: Set<UUID> = []
     @State private var lists: [SavedList] = []
@@ -79,7 +80,13 @@ struct HomeView: View {
                         selection.removeAll()
                     }
                 }
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    // Lists moved off the tab bar to make room for Friends.
+                    Button {
+                        showingLists = true
+                    } label: {
+                        Image(systemName: "folder")
+                    }
                     Button {
                         showingAsk = true
                     } label: {
@@ -99,6 +106,9 @@ struct HomeView: View {
             }
             .sheet(isPresented: $showingAsk) {
                 AskView()
+            }
+            .sheet(isPresented: $showingLists) {
+                ListsView()
             }
             .navigationDestination(for: Save.self) { save in
                 SaveDetailView(save: save)

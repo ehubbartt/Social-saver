@@ -51,7 +51,8 @@ Share Extension ──► Edge Function: process-save
 | Other videos about a place | ✅ | ✅ community (anonymized) **+ web search** |
 | Quick reviews of places | ✅ | ✅ stars + worth-it verdict + written take |
 | Trip planning | ➖ (map only) | ✅ **trips with day-by-day itineraries + AI auto-plan** |
-| Social layer (friends, blends) | ✅ | ➖ future (schema supports it) |
+| Friends + activity feed | ✅ | ✅ opt-in publish model (see below) |
+| Social layer (blends, voting, shared trips) | ✅ | ➖ future (schema supports it) |
 
 AI extraction can be wrong, so **everything it writes is editable**: open a
 save → ⋯ → Edit to change the title, summary, and category, and to remove,
@@ -184,6 +185,26 @@ The same screen hosts **place reviews**: a 1–5 star rating, an explicit
 line answers the real question ("4.5 ★ · 6 of 7 say it's worth it"). One
 editable review per person per place; reviews are community-readable by
 design but show no identity beyond a "You" tag on your own.
+
+### Friends & the feed
+
+Add friends by exact username (claimed in Profile; deliberately no browse or
+substring search, so the user base can't be scraped). The Friends tab shows a
+feed of what friends chose to share, under a strict privacy model —
+**nothing is ever published implicitly**:
+
+- **Recommend a save** (⋯ menu on your save) — that one save appears in
+  friends' feeds; un-recommend anytime.
+- **Share a list** (person icon in a list) — the list and its saves become
+  visible to friends; new saves filed into it stay visible, and the list is
+  badged so you don't file something sensitive there by accident.
+- **Reviews** appear attributed to friends (disclosed in the review sheet).
+
+Personal notes live in a separate per-user table and are **never** visible to
+anyone, even on shared saves. Profile → "Your activity & sharing" lists
+everything you've published with one-swipe removal, plus a global **Pause
+sharing** switch that hides all of it instantly. Unfriending removes access
+in both directions automatically.
 
 ## Notes & limitations
 

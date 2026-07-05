@@ -70,6 +70,7 @@ Deno.serve(async (req) => {
       supabase
         .from("saves")
         .select("id, title, summary, content_type, save_places(place:places(name, city, country))")
+        .eq("user_id", userData.user.id)
         .eq("status", "processed")
         .order("created_at", { ascending: false })
         .limit(200),

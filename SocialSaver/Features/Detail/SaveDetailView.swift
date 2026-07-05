@@ -11,9 +11,15 @@ struct SaveDetailView: View {
     @State private var confirmation: String?
     @State private var showingEdit = false
     @State private var placeForVideos: Place?
+    @State private var isRecommended = false
 
     private let listsRepository = ListsRepository()
     private let savesRepository = SavesRepository()
+    private let feedRepository = FeedRepository()
+
+    private var isMine: Bool {
+        save.userId == SupabaseClientProvider.currentUserId
+    }
 
     init(save: Save) {
         _save = State(initialValue: save)
@@ -92,20 +98,32 @@ struct SaveDetailView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
-                    Button {
-                        showingEdit = true
-                    } label: {
-                        Label("Edit", systemImage: "pencil")
+                    if isMine {
+                        Button {
+                            showingEdit = true
+                        } label: {
+                            Label("Edit", systemImage: "pencil")
+                        }
+                        Button {
+                            Task { await toggleRecommend() }
+                        } label: {
+                            Label(
+                                isRecommended ? "Stop recommending" : "Recommend to friends",
+                                systemImage: isRecommended ? "hand.thumbsup.fill" : "hand.thumbsup"
+                            )
+                        }
                     }
                     addToListMenu
-                    Divider()
-                    Button(role: .destructive) {
-                        Task {
-                            await store.delete(save)
-                            dismiss()
+                    if isMine {
+                        Divider()
+                        Button(role: .destructive) {
+                            Task {
+                                await store.delete(save)
+                                dismiss()
+                            }
+                        } label: {
+                            Label("Delete save", systemImage: "trash")
                         }
-                    } label: {
-                        Label("Delete save", systemImage: "trash")
                     }
                 } label: {
                     Image(systemName: "ellipsis.circle")
@@ -114,6 +132,9 @@ struct SaveDetailView: View {
         }
         .task {
             lists = (try? await listsRepository.fetchLists()) ?? []
+            if isMine {
+                isRecommended = (try? await feedRepository.isRecommended(saveId: save.id)) ?? false
+            }
         }
         .sheet(item: $placeForVideos) { place in
             NavigationStack {
@@ -244,6 +265,22 @@ struct SaveDetailView: View {
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             }
+        }
+    }
+
+    private func toggleRecommend() async {
+        do {
+            if isRecommended {
+                try await feedRepository.unrecommend(saveId: save.id)
+                isRecommended = false
+                confirmation = "Removed from friends' feeds"
+            } else {
+                try await feedRepository.recommend(saveId: save.id)
+                isRecommended = true
+                confirmation = "Recommended — visible to your friends"
+            }
+        } catch {
+            confirmation = "Couldn't update. Try again."
         }
     }
 

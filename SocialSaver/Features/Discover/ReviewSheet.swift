@@ -69,9 +69,13 @@ struct ReviewSheet: View {
                     .pickerStyle(.segmented)
                 }
 
-                Section("Your take") {
+                Section {
                     TextField("Was it worth the hype? Tips for going?", text: $text, axis: .vertical)
                         .lineLimit(3...8)
+                } header: {
+                    Text("Your take")
+                } footer: {
+                    Text("Reviews are visible to other users. Friends see them with your username in their feed.")
                 }
 
                 if existing != nil {

@@ -19,6 +19,11 @@ struct ListsView: View {
                         HStack {
                             Text(list.emoji ?? "📁")
                             Text(list.name)
+                            if list.isFriendsVisible {
+                                Image(systemName: "person.2.fill")
+                                    .font(.caption2)
+                                    .foregroundStyle(.tint)
+                            }
                         }
                     }
                 }
@@ -82,9 +87,21 @@ struct ListDetailView: View {
     let list: SavedList
     @State private var saves: [Save] = []
     @State private var searchText = ""
+    @State private var isFriendsVisible: Bool
+    @State private var visibilityNotice: String?
 
     private let repository = ListsRepository()
+    private let feedRepository = FeedRepository()
     private let columns = [GridItem(.adaptive(minimum: 160), spacing: 12)]
+
+    private var isMine: Bool {
+        list.userId == SupabaseClientProvider.currentUserId
+    }
+
+    init(list: SavedList) {
+        self.list = list
+        _isFriendsVisible = State(initialValue: list.isFriendsVisible)
+    }
 
     private var filteredSaves: [Save] {
         let query = searchText.trimmingCharacters(in: .whitespaces)
@@ -120,10 +137,12 @@ struct ListDetailView: View {
                     }
                     .buttonStyle(.plain)
                     .contextMenu {
-                        Button(role: .destructive) {
-                            Task { await remove(save) }
-                        } label: {
-                            Label("Remove from list", systemImage: "folder.badge.minus")
+                        if isMine {
+                            Button(role: .destructive) {
+                                Task { await remove(save) }
+                            } label: {
+                                Label("Remove from list", systemImage: "folder.badge.minus")
+                            }
                         }
                     }
                 }
@@ -133,10 +152,37 @@ struct ListDetailView: View {
         .navigationTitle("\(list.emoji ?? "") \(list.name)")
         .searchable(text: $searchText, prompt: "Search this list")
         .toolbar {
+            if isMine {
+                Menu {
+                    Button {
+                        Task { await setVisibility(!isFriendsVisible) }
+                    } label: {
+                        Label(
+                            isFriendsVisible ? "Make private" : "Share with friends",
+                            systemImage: isFriendsVisible ? "lock" : "person.2"
+                        )
+                    }
+                } label: {
+                    Image(systemName: isFriendsVisible ? "person.2.fill" : "person.2")
+                }
+            }
             ShareLink(item: exportText) {
                 Image(systemName: "square.and.arrow.up")
             }
             .disabled(saves.isEmpty)
+        }
+        .overlay(alignment: .bottom) {
+            if let visibilityNotice {
+                Text(visibilityNotice)
+                    .font(.footnote)
+                    .padding(10)
+                    .background(.thinMaterial, in: Capsule())
+                    .padding(.bottom, 16)
+                    .task(id: visibilityNotice) {
+                        try? await Task.sleep(for: .seconds(2.5))
+                        self.visibilityNotice = nil
+                    }
+            }
         }
         .navigationDestination(for: Save.self) { save in
             SaveDetailView(save: save)
@@ -154,5 +200,17 @@ struct ListDetailView: View {
     private func remove(_ save: Save) async {
         try? await repository.removeSave(save.id, from: list.id)
         saves.removeAll { $0.id == save.id }
+    }
+
+    private func setVisibility(_ friendsVisible: Bool) async {
+        do {
+            try await feedRepository.setListVisibility(list: list, friendsVisible: friendsVisible)
+            isFriendsVisible = friendsVisible
+            visibilityNotice = friendsVisible
+                ? "Visible to your friends — new saves added here will be too"
+                : "Private again — removed from friends' feeds"
+        } catch {
+            visibilityNotice = "Couldn't change visibility. Try again."
+        }
     }
 }
