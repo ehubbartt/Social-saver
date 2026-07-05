@@ -49,6 +49,7 @@ Share Extension ──► Edge Function: process-save
 | Fix a wrong location | ❌ | ✅ replace via Apple Maps search |
 | Share a list | ✅ (requires accounts) | ✅ text export via share sheet |
 | Other videos about a place | ✅ | ✅ community (anonymized) **+ web search** |
+| Quick reviews of places | ✅ | ✅ stars + worth-it verdict + written take |
 | Trip planning | ➖ (map only) | ✅ **trips with day-by-day itineraries + AI auto-plan** |
 | Social layer (friends, blends) | ✅ | ➖ future (schema supports it) |
 
@@ -167,6 +168,12 @@ browse other videos about that spot from two sources:
 
 Any discovered video has a save button that runs it through the normal
 ingest pipeline, making it a first-class save of your own.
+
+The same screen hosts **place reviews**: a 1–5 star rating, an explicit
+"Worth it / Skip it" verdict, and an optional written take — so the summary
+line answers the real question ("4.5 ★ · 6 of 7 say it's worth it"). One
+editable review per person per place; reviews are community-readable by
+design but show no identity beyond a "You" tag on your own.
 
 ## Notes & limitations
 

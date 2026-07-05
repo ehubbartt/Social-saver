@@ -16,9 +16,18 @@ struct PlaceVideosView: View {
     @State private var isSearchingWeb = false
     @State private var savedURLs: Set<String> = []
     @State private var savingURLs: Set<String> = []
+    @State private var reviews: [PlaceReview] = []
+    @State private var reviewsLoaded = false
+    @State private var showingReviewSheet = false
     @State private var errorMessage: String?
 
     private let repository = SavesRepository()
+    private let reviewsRepository = ReviewsRepository()
+
+    private var myReview: PlaceReview? {
+        guard let me = reviewsRepository.currentUserId else { return nil }
+        return reviews.first { $0.userId == me }
+    }
 
     var body: some View {
         List {
@@ -27,6 +36,28 @@ struct PlaceVideosView: View {
                     Text(place.subtitle)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+                }
+            }
+
+            Section("Reviews") {
+                if reviewsLoaded && !reviews.isEmpty {
+                    reviewSummary
+                }
+                Button {
+                    showingReviewSheet = true
+                } label: {
+                    Label(
+                        myReview == nil ? "Write a review" : "Edit your review",
+                        systemImage: myReview == nil ? "square.and.pencil" : "pencil"
+                    )
+                }
+                if reviewsLoaded && reviews.isEmpty {
+                    Text("Be the first to say whether it's worth it.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                ForEach(reviews) { review in
+                    reviewRow(review)
                 }
             }
 
@@ -87,9 +118,59 @@ struct PlaceVideosView: View {
         .navigationTitle(place.name)
         .navigationBarTitleDisplayMode(.inline)
         .task {
-            community = (try? await repository.communityVideos(placeId: place.id)) ?? []
+            async let communityTask = repository.communityVideos(placeId: place.id)
+            async let reviewsTask = reviewsRepository.fetchReviews(placeId: place.id)
+            community = (try? await communityTask) ?? []
             communityLoaded = true
+            reviews = (try? await reviewsTask) ?? []
+            reviewsLoaded = true
         }
+        .sheet(isPresented: $showingReviewSheet) {
+            ReviewSheet(place: place, existing: myReview) {
+                reviews = (try? await reviewsRepository.fetchReviews(placeId: place.id)) ?? reviews
+            }
+        }
+    }
+
+    private var reviewSummary: some View {
+        let count = reviews.count
+        let average = Double(reviews.reduce(0) { $0 + $1.rating }) / Double(count)
+        let worthCount = reviews.filter(\.worthIt).count
+        return HStack(spacing: 8) {
+            StarsView(rating: Int(average.rounded()), size: .subheadline)
+            Text(String(format: "%.1f", average))
+                .font(.subheadline.weight(.semibold))
+            Text("· \(worthCount) of \(count) say it's worth it")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func reviewRow(_ review: PlaceReview) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                StarsView(rating: review.rating)
+                Image(systemName: review.worthIt ? "hand.thumbsup.fill" : "hand.thumbsdown.fill")
+                    .font(.caption)
+                    .foregroundStyle(review.worthIt ? Color.green : Color.orange)
+                if review.userId == reviewsRepository.currentUserId {
+                    Text("You")
+                        .font(.caption2.weight(.semibold))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.accentColor.opacity(0.15), in: Capsule())
+                }
+                Spacer()
+                Text(review.createdAt.formatted(date: .abbreviated, time: .omitted))
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+            if let body = review.body, !body.isEmpty {
+                Text(body)
+                    .font(.subheadline)
+            }
+        }
+        .padding(.vertical, 2)
     }
 
     private func videoRow(title: String, subtitle: String, thumbnailUrl: String?, url: String) -> some View {

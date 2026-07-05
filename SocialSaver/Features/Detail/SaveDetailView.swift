@@ -213,7 +213,7 @@ struct SaveDetailView: View {
             Button {
                 placeForVideos = place
             } label: {
-                Label("More videos", systemImage: "play.square.stack")
+                Label("Reviews & videos", systemImage: "play.square.stack")
             }
         }
         .buttonStyle(.bordered)

@@ -67,7 +67,7 @@ struct PlaceSheetView: View {
                     NavigationLink {
                         PlaceVideosView(place: pin.place)
                     } label: {
-                        Label("More videos about this place", systemImage: "play.square.stack")
+                        Label("Reviews & more videos", systemImage: "play.square.stack")
                     }
                 }
                 Section("Saved from") {

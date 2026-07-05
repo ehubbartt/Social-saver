@@ -160,12 +160,15 @@ code change. Required adjustments:
 
 ## Migration plan
 
-- `0010_friends.sql` — username uniqueness + `lookup_username` RPC +
-  `friendships` + its RLS. (0009 was taken by place discovery, which
-  independently validated the security-definer pattern this plan relies on:
-  `videos_for_place` exposes anonymized public video links across users
-  without touching saves RLS.)
-- `0011_sharing.sql` — member tables, helper functions, full policy rewrite
+Two migrations (numbers assigned at implementation time — discovery and
+reviews have since claimed 0009/0010, and both independently validated the
+patterns this plan relies on: `videos_for_place` uses the security-definer
+approach, and `place_reviews` establishes community-readable content
+alongside private saves):
+
+- `..._friends.sql` — username uniqueness + `lookup_username` RPC +
+  `friendships` + its RLS.
+- `..._sharing.sql` — member tables, helper functions, full policy rewrite
   (drop + recreate as new migration files, never editing applied ones),
   `save_notes` migration (`insert ... select from saves where note is not
   null`, then drop `saves.note`), and the new indexes.

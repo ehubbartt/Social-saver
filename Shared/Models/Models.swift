@@ -179,6 +179,26 @@ struct ListItemJoin: Codable, Hashable {
     let save: Save
 }
 
+struct PlaceReview: Codable, Identifiable, Hashable {
+    let id: UUID
+    let placeId: UUID
+    let userId: UUID
+    let rating: Int
+    let worthIt: Bool
+    let body: String?
+    let createdAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case placeId = "place_id"
+        case userId = "user_id"
+        case rating
+        case worthIt = "worth_it"
+        case body
+        case createdAt = "created_at"
+    }
+}
+
 struct Trip: Codable, Identifiable, Hashable {
     let id: UUID
     let userId: UUID
