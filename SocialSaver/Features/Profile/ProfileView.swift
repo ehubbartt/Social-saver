@@ -16,6 +16,11 @@ struct ProfileView: View {
 
                 Section {
                     NavigationLink {
+                        NotificationSettingsView()
+                    } label: {
+                        Label("Daily briefings", systemImage: "bell.badge")
+                    }
+                    NavigationLink {
                         GuideView()
                     } label: {
                         Label("How to save", systemImage: "questionmark.circle")

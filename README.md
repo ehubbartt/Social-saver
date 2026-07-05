@@ -80,6 +80,16 @@ destination, vacation dates) and build each day's schedule:
 - **When to leave** — give a stop a time (e.g. a 13:00 reservation or a
   flight departure) and the route view computes "Leave by 12:38 to arrive
   13:00" from the actual travel time of that leg.
+- **Today view** — while a trip is live, the Trips tab surfaces "Today ·
+  Day N": the day's timeline, the weather with a what-to-wear tip
+  (Open-Meteo, free, no key), and your morning math — wake-up and leave-by
+  times computed from the first timed stop and real directions from your
+  hotel.
+- **Daily briefings** (Profile → Daily briefings, opt-in) — a local
+  notification each trip morning: the day's stops, weather and what to
+  wear, and when to wake up and leave. Configurable delivery time,
+  getting-ready buffer, and an optional 9 PM preview the night before.
+  All scheduling is on-device; no push server involved.
 - **Trip assistant** — a chat agent per trip (bubble icon) that answers
   questions, recommends what to do (with live web search), and edits the
   itinerary on request: "move the ramen spot to day 3", "add my flight,

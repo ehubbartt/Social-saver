@@ -24,9 +24,41 @@ struct TripsView: View {
         }
     }
 
+    /// The trip happening right now, with today's 1-based day number.
+    private var activeTripDay: (trip: Trip, day: Int)? {
+        let today = Calendar.current.startOfDay(for: .now)
+        for trip in trips {
+            guard let start = trip.startDateValue, let end = trip.endDateValue,
+                  today >= start, today <= end else { continue }
+            let day = (Calendar.current.dateComponents([.day], from: start, to: today).day ?? 0) + 1
+            return (trip, min(day, trip.dayCount))
+        }
+        return nil
+    }
+
     var body: some View {
         NavigationStack {
             List {
+                if let active = activeTripDay {
+                    Section {
+                        NavigationLink {
+                            TodayView(trip: active.trip, day: active.day)
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "sun.max.fill")
+                                    .font(.title2)
+                                    .foregroundStyle(.yellow)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Today · Day \(active.day) in \(active.trip.destination)")
+                                        .font(.headline)
+                                    Text("Plan, weather, and when to leave")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+                }
                 ForEach(sortedTrips) { trip in
                     NavigationLink {
                         TripDetailView(trip: trip)
@@ -56,7 +88,10 @@ struct TripsView: View {
                 }
             }
             .refreshable { await refresh() }
-            .task { await refresh() }
+            .task {
+                await refresh()
+                await BriefingScheduler.shared.refresh()
+            }
             .sheet(isPresented: $showingCreate) {
                 CreateTripSheet {
                     await refresh()
