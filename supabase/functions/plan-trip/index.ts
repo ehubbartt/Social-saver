@@ -66,7 +66,7 @@ Deno.serve(async (req) => {
     const dayCount = computeDayCount(trip.start_date, trip.end_date);
 
     const [{ data: items }, { data: saves }] = await Promise.all([
-      supabase.from("trip_items").select("save_id, day_index").eq("trip_id", trip_id),
+      supabase.from("trip_items").select("save_id, day_index").eq("trip_id", trip_id).eq("kind", "save"),
       supabase
         .from("saves")
         .select("id, title, summary, content_type, save_places(place:places(name, city, country))")

@@ -10,10 +10,18 @@ struct TripDetailView: View {
     @State private var isPlanning = false
     @State private var planSummary: String?
     @State private var showingAddSaves = false
+    @State private var addStopKind: TripItemKind?
+    @State private var timeEditItem: TripItem?
+    @State private var routeDay: DayRef?
     @State private var showingMap = false
     @State private var errorMessage: String?
 
     private let repository = TripsRepository()
+
+    struct DayRef: Identifiable {
+        let day: Int
+        var id: Int { day }
+    }
 
     private var ideas: [TripItem] { items.filter { $0.dayIndex == nil } }
 
@@ -33,28 +41,50 @@ struct TripDetailView: View {
             }
 
             ForEach(1...trip.dayCount, id: \.self) { day in
-                Section(dayTitle(day)) {
+                Section {
                     let dayItems = items(forDay: day)
                     if dayItems.isEmpty {
-                        Text("Nothing planned")
+                        Text("Nothing planned — drag stops here")
                             .font(.footnote)
                             .foregroundStyle(.tertiary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .dropDestination(for: String.self) { ids, _ in
+                                handleDrop(ids, toDay: day, before: nil)
+                            }
                     }
                     ForEach(dayItems) { item in
                         itemRow(item)
+                            .draggable(item.id.uuidString)
+                            .dropDestination(for: String.self) { ids, _ in
+                                handleDrop(ids, toDay: day, before: item)
+                            }
                     }
+                    if !dayItems.isEmpty {
+                        dropTail(day: day)
+                    }
+                } header: {
+                    dayHeader(day)
                 }
             }
 
-            Section("Ideas") {
+            Section {
                 if ideas.isEmpty {
                     Text("Saves added to the trip but not scheduled land here.")
                         .font(.footnote)
                         .foregroundStyle(.tertiary)
+                        .dropDestination(for: String.self) { ids, _ in
+                            handleDrop(ids, toDay: nil, before: nil)
+                        }
                 }
                 ForEach(ideas) { item in
                     itemRow(item)
+                        .draggable(item.id.uuidString)
+                        .dropDestination(for: String.self) { ids, _ in
+                            handleDrop(ids, toDay: nil, before: item)
+                        }
                 }
+            } header: {
+                Text("Ideas")
             }
 
             if let errorMessage {
@@ -77,15 +107,31 @@ struct TripDetailView: View {
                     Button {
                         showingAddSaves = true
                     } label: {
-                        Label("Add saves", systemImage: "plus")
+                        Label("Add saves", systemImage: "bookmark")
                     }
+                    Button {
+                        addStopKind = .flight
+                    } label: {
+                        Label("Add flight", systemImage: "airplane")
+                    }
+                    Button {
+                        addStopKind = .hotel
+                    } label: {
+                        Label("Add hotel", systemImage: "bed.double")
+                    }
+                    Button {
+                        addStopKind = .custom
+                    } label: {
+                        Label("Add custom stop", systemImage: "mappin")
+                    }
+                    Divider()
                     Button {
                         Task { await autoPlan() }
                     } label: {
                         Label("Auto-plan from my saves", systemImage: "wand.and.stars")
                     }
                 } label: {
-                    Image(systemName: "ellipsis.circle")
+                    Image(systemName: "plus")
                 }
             }
         }
@@ -106,9 +152,22 @@ struct TripDetailView: View {
             await store.refresh()
         }
         .sheet(isPresented: $showingAddSaves) {
-            AddSavesToTripSheet(trip: trip, existingSaveIds: Set(items.map(\.save.id))) {
+            AddSavesToTripSheet(trip: trip, existingSaveIds: Set(items.compactMap(\.save?.id))) {
                 await refresh()
             }
+        }
+        .sheet(item: $addStopKind) { kind in
+            AddStopSheet(trip: trip, kind: kind) {
+                await refresh()
+            }
+        }
+        .sheet(item: $timeEditItem) { item in
+            ItemTimeSheet(item: item) {
+                await refresh()
+            }
+        }
+        .sheet(item: $routeDay) { ref in
+            DayRouteView(trip: trip, day: ref.day, items: items(forDay: ref.day))
         }
         .sheet(isPresented: $showingMap) {
             TripMapView(trip: trip, pins: pins)
@@ -130,6 +189,24 @@ struct TripDetailView: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.tint)
                 }
+                Text("Tip: press and hold any stop to drag it onto a day.")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+        }
+    }
+
+    private func dayHeader(_ day: Int) -> some View {
+        HStack {
+            Text(dayTitle(day))
+            Spacer()
+            if items(forDay: day).contains(where: { $0.coordinate != nil }) {
+                Button {
+                    routeDay = DayRef(day: day)
+                } label: {
+                    Label("Route", systemImage: "point.topleft.down.to.point.bottomright.curvepath")
+                        .font(.caption)
+                }
             }
         }
     }
@@ -141,26 +218,54 @@ struct TripDetailView: View {
         return "Day \(day)"
     }
 
+    /// Invisible drop target so items can be dropped at the end of a day.
+    private func dropTail(day: Int?) -> some View {
+        Color.clear
+            .frame(maxWidth: .infinity)
+            .frame(height: 6)
+            .listRowSeparator(.hidden)
+            .dropDestination(for: String.self) { ids, _ in
+                handleDrop(ids, toDay: day, before: nil)
+            }
+    }
+
     private func itemRow(_ item: TripItem) -> some View {
         HStack(spacing: 10) {
-            AsyncImage(url: item.save.thumbnailUrl.flatMap { URL(string: $0) }) { image in
-                image.resizable().aspectRatio(contentMode: .fill)
-            } placeholder: {
-                ZStack {
-                    Color(.secondarySystemBackground)
-                    Image(systemName: item.save.contentType.systemImage)
-                        .foregroundStyle(.secondary)
+            if let save = item.save {
+                AsyncImage(url: save.thumbnailUrl.flatMap { URL(string: $0) }) { image in
+                    image.resizable().aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    ZStack {
+                        Color(.secondarySystemBackground)
+                        Image(systemName: save.contentType.systemImage)
+                            .foregroundStyle(.secondary)
+                    }
                 }
+                .frame(width: 48, height: 48)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            } else {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.accentColor.opacity(0.12))
+                    Image(systemName: item.kind.systemImage)
+                        .foregroundStyle(.tint)
+                }
+                .frame(width: 48, height: 48)
             }
-            .frame(width: 48, height: 48)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(item.save.title ?? item.save.sourceUrl)
-                    .font(.subheadline)
-                    .lineLimit(1)
-                if let place = item.save.places.first {
-                    Text(place.name)
+                HStack(spacing: 6) {
+                    if let time = item.timeDisplay {
+                        Text(time)
+                            .font(.caption.bold())
+                            .foregroundStyle(.tint)
+                    }
+                    Text(item.displayTitle)
+                        .font(.subheadline)
+                        .lineLimit(1)
+                }
+                if let subtitle = item.subtitle {
+                    Text(subtitle)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -176,6 +281,12 @@ struct TripDetailView: View {
             Spacer()
 
             Menu {
+                Button {
+                    timeEditItem = item
+                } label: {
+                    Label(item.startTime == nil ? "Set time…" : "Change time…", systemImage: "clock")
+                }
+                Divider()
                 ForEach(1...trip.dayCount, id: \.self) { day in
                     Button("Day \(day)") {
                         Task { await move(item, toDay: day) }
@@ -195,22 +306,50 @@ struct TripDetailView: View {
             }
         }
         .background {
-            NavigationLink("") {
-                SaveDetailView(save: item.save)
+            if let save = item.save {
+                NavigationLink("") {
+                    SaveDetailView(save: save)
+                }
+                .opacity(0)
             }
-            .opacity(0)
         }
     }
 
     private var pins: [PlacePin] {
         var byPlace: [UUID: PlacePin] = [:]
         for item in items {
-            for place in item.save.places where place.latitude != nil && place.longitude != nil {
-                byPlace[place.id, default: PlacePin(place: place, saves: [])].saves.append(item.save)
+            guard let save = item.save else { continue }
+            for place in save.places where place.latitude != nil && place.longitude != nil {
+                byPlace[place.id, default: PlacePin(place: place, saves: [])].saves.append(save)
             }
         }
         return Array(byPlace.values)
     }
+
+    // MARK: - Drag & drop
+
+    private func handleDrop(_ ids: [String], toDay day: Int?, before target: TripItem?) -> Bool {
+        guard let idString = ids.first,
+              let uuid = UUID(uuidString: idString),
+              let dragged = items.first(where: { $0.id == uuid })
+        else { return false }
+        guard dragged.id != target?.id else { return true }
+
+        Task {
+            var dayItems = items.filter { $0.dayIndex == day && $0.id != dragged.id }
+            let insertIndex = target.flatMap { t in dayItems.firstIndex(where: { $0.id == t.id }) }
+                ?? dayItems.count
+            dayItems.insert(dragged, at: insertIndex)
+            // Renumber the whole target day so ordering stays stable.
+            for (index, item) in dayItems.enumerated() {
+                try? await repository.setPlacement(itemId: item.id, day: day, position: index * 10)
+            }
+            await refresh()
+        }
+        return true
+    }
+
+    // MARK: - Data
 
     private func refresh() async {
         isLoading = items.isEmpty
@@ -248,6 +387,10 @@ struct TripDetailView: View {
             errorMessage = error.localizedDescription
         }
     }
+}
+
+extension TripItemKind: Identifiable {
+    var id: String { rawValue }
 }
 
 /// Picker for adding saved videos to a trip, with destination-relevant saves

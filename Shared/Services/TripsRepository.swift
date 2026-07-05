@@ -82,6 +82,67 @@ struct TripsRepository {
             .execute()
     }
 
+    /// Drag-and-drop support: place an item on a day at a specific position.
+    func setPlacement(itemId: UUID, day: Int?, position: Int) async throws {
+        let dayValue: AnyJSON = day.map { AnyJSON.integer($0) } ?? .null
+        try await client.from("trip_items")
+            .update(["day_index": dayValue, "position": AnyJSON.integer(position)])
+            .eq("id", value: itemId)
+            .execute()
+    }
+
+    static let timeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm:ss"
+        return formatter
+    }()
+
+    func setTime(itemId: UUID, time: Date?) async throws {
+        let value: AnyJSON = time.map { AnyJSON.string(Self.timeFormatter.string(from: $0)) } ?? .null
+        try await client.from("trip_items")
+            .update(["start_time": value])
+            .eq("id", value: itemId)
+            .execute()
+    }
+
+    /// Standalone itinerary entries: flights, hotels, transport, custom stops.
+    func addCustomItem(
+        tripId: UUID,
+        kind: TripItemKind,
+        title: String,
+        detail: String?,
+        day: Int?,
+        time: Date?,
+        latitude: Double?,
+        longitude: Double?,
+        address: String?
+    ) async throws {
+        struct NewItem: Encodable {
+            let trip_id: UUID
+            let kind: String
+            let title: String
+            let detail: String?
+            let day_index: Int?
+            let start_time: String?
+            let latitude: Double?
+            let longitude: Double?
+            let address: String?
+        }
+        try await client.from("trip_items")
+            .insert(NewItem(
+                trip_id: tripId,
+                kind: kind.rawValue,
+                title: title,
+                detail: detail,
+                day_index: day,
+                start_time: time.map { Self.timeFormatter.string(from: $0) },
+                latitude: latitude,
+                longitude: longitude,
+                address: address
+            ))
+            .execute()
+    }
+
     func removeItem(id: UUID) async throws {
         try await client.from("trip_items").delete().eq("id", value: id).execute()
     }

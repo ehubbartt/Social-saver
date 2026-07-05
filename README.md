@@ -59,12 +59,25 @@ the fixed pin has real coordinates and a real address.
 ### Trip planner
 
 The Trips tab turns saves into actual travel plans. Create a trip (name,
-destination, optional dates) and either add saves by hand — destination-
-relevant ones sort to the top — or tap **Auto-plan from my saves**: the
-backend picks the saves that belong on this trip and groups them into
-sensible days (same neighborhood together, 2–5 items per day), each with a
-short placement note. Items move between days or back to the Ideas bucket
-with one tap, and every trip has its own map of just its places.
+destination, vacation dates) and build each day's schedule:
+
+- **Drag & drop** — press and hold any stop and drag it onto a day (or back
+  to Ideas); ordering within a day is preserved. A menu offers the same moves
+  for one-handed use.
+- **Auto-plan from my saves** — the backend picks the saves that belong on
+  this trip and groups them into sensible days (same neighborhood together,
+  2–5 items per day), each with a short placement note. Re-run anytime;
+  manual choices are never deleted.
+- **Flights, hotels & custom stops** — add non-save entries with a title,
+  details (confirmation #), a day, a time, and an optional location via
+  Apple Maps search.
+- **Day route ("wire map")** — each day header has a Route button showing
+  numbered stops connected by real walking/driving routes, with distance and
+  travel time per leg (dashed straight line as a fallback estimate when
+  directions are unavailable).
+- **When to leave** — give a stop a time (e.g. a 13:00 reservation or a
+  flight departure) and the route view computes "Leave by 12:38 to arrive
+  13:00" from the actual travel time of that leg.
 
 ## Setup
 

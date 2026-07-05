@@ -1,4 +1,5 @@
 import Foundation
+import CoreLocation
 
 enum AuthError: Error {
     case sessionMissing
@@ -234,13 +235,54 @@ struct Trip: Codable, Identifiable, Hashable {
     }
 }
 
+enum TripItemKind: String, Codable {
+    case save
+    case flight
+    case hotel
+    case transport
+    case custom
+
+    init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = TripItemKind(rawValue: raw) ?? .custom
+    }
+
+    var systemImage: String {
+        switch self {
+        case .save: return "play.rectangle"
+        case .flight: return "airplane"
+        case .hotel: return "bed.double"
+        case .transport: return "tram"
+        case .custom: return "mappin"
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .save: return "Save"
+        case .flight: return "Flight"
+        case .hotel: return "Hotel"
+        case .transport: return "Transport"
+        case .custom: return "Stop"
+        }
+    }
+}
+
 struct TripItem: Codable, Identifiable, Hashable {
     let id: UUID
     let tripId: UUID
     let dayIndex: Int?
     let position: Int
     let note: String?
-    let save: Save
+    let kind: TripItemKind
+    let title: String?
+    let detail: String?
+    /// Postgres `time` as "HH:mm:ss".
+    let startTime: String?
+    let latitude: Double?
+    let longitude: Double?
+    let address: String?
+    let save: Save?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -248,6 +290,47 @@ struct TripItem: Codable, Identifiable, Hashable {
         case dayIndex = "day_index"
         case position
         case note
+        case kind
+        case title
+        case detail
+        case startTime = "start_time"
+        case latitude
+        case longitude
+        case address
         case save
+    }
+
+    var displayTitle: String {
+        title ?? save?.title ?? save?.sourceUrl ?? "Stop"
+    }
+
+    var subtitle: String? {
+        if let place = save?.places.first { return place.name }
+        if let address, !address.isEmpty { return address }
+        if let detail, !detail.isEmpty { return detail }
+        return nil
+    }
+
+    /// Own location for custom entries, else the save's first mapped place.
+    var coordinate: CLLocationCoordinate2D? {
+        if let latitude, let longitude {
+            return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+        }
+        if let place = save?.places.first(where: { $0.latitude != nil && $0.longitude != nil }) {
+            return CLLocationCoordinate2D(latitude: place.latitude ?? 0, longitude: place.longitude ?? 0)
+        }
+        return nil
+    }
+
+    var timeComponents: (hour: Int, minute: Int)? {
+        guard let startTime else { return nil }
+        let parts = startTime.split(separator: ":").compactMap { Int($0) }
+        guard parts.count >= 2 else { return nil }
+        return (parts[0], parts[1])
+    }
+
+    var timeDisplay: String? {
+        guard let (hour, minute) = timeComponents else { return nil }
+        return String(format: "%02d:%02d", hour, minute)
     }
 }
