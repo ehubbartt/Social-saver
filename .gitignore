@@ -1,0 +1,19 @@
+# Xcode
+*.xcodeproj
+xcuserdata/
+DerivedData/
+*.xcresult
+.build/
+.swiftpm/
+
+# Secrets — copy SupabaseConfig.example.swift to SupabaseConfig.swift and fill in
+Shared/Config/SupabaseConfig.swift
+
+# Supabase local dev
+supabase/.temp/
+supabase/.branches/
+.env
+.env.local
+
+# macOS
+.DS_Store
