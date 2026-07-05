@@ -14,6 +14,7 @@ struct TripDetailView: View {
     @State private var timeEditItem: TripItem?
     @State private var routeDay: DayRef?
     @State private var showingMap = false
+    @State private var showingChat = false
     @State private var errorMessage: String?
 
     private let repository = TripsRepository()
@@ -98,6 +99,11 @@ struct TripDetailView: View {
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Button {
+                    showingChat = true
+                } label: {
+                    Image(systemName: "bubble.left.and.text.bubble.right")
+                }
+                Button {
                     showingMap = true
                 } label: {
                     Image(systemName: "map")
@@ -171,6 +177,11 @@ struct TripDetailView: View {
         }
         .sheet(isPresented: $showingMap) {
             TripMapView(trip: trip, pins: pins)
+        }
+        .sheet(isPresented: $showingChat) {
+            TripChatView(trip: trip) {
+                await refresh()
+            }
         }
     }
 

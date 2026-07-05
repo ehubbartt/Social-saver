@@ -154,6 +154,29 @@ struct TripsRepository {
             options: FunctionInvokeOptions(body: ["trip_id": tripId.uuidString])
         )
     }
+
+    /// One turn of the trip agent conversation. The full transcript is sent
+    /// each time; the server is stateless.
+    func chat(tripId: UUID, messages: [TripChatTurn]) async throws -> TripChatResponse {
+        struct Body: Encodable {
+            let trip_id: String
+            let messages: [TripChatTurn]
+        }
+        return try await client.functions.invoke(
+            "trip-agent",
+            options: FunctionInvokeOptions(body: Body(trip_id: tripId.uuidString, messages: messages))
+        )
+    }
+}
+
+struct TripChatTurn: Codable {
+    let role: String
+    let content: String
+}
+
+struct TripChatResponse: Codable {
+    let reply: String
+    let changed: Bool
 }
 
 struct PlanTripResponse: Codable {

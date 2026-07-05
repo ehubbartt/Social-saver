@@ -78,6 +78,16 @@ destination, vacation dates) and build each day's schedule:
 - **When to leave** — give a stop a time (e.g. a 13:00 reservation or a
   flight departure) and the route view computes "Leave by 12:38 to arrive
   13:00" from the actual travel time of that leg.
+- **Trip assistant** — a chat agent per trip (bubble icon) that answers
+  questions, recommends what to do (with live web search), and edits the
+  itinerary on request: "move the ramen spot to day 3", "add my flight,
+  UA 837 landing 14:20 day 1", "find a breakfast place near the hotel and
+  add it". The agent can only touch the trip through six strictly-typed
+  tools (add stop, add save, move, set time, set note, remove) whose inputs
+  are schema-enforced and re-validated server-side under the user's own
+  session — days must be 1..N or Ideas, times must be HH:MM, ids must be
+  real, removals only on explicit request, and it can never see or modify
+  anything outside the current trip.
 
 ## Setup
 
@@ -94,6 +104,7 @@ destination, vacation dates) and build each day's schedule:
    supabase functions deploy process-save
    supabase functions deploy ask-saves
    supabase functions deploy plan-trip
+   supabase functions deploy trip-agent
    supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
    ```
 4. In Authentication settings, enable Email sign-in (email confirmation
