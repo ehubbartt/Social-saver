@@ -177,3 +177,77 @@ struct SavedList: Codable, Identifiable, Hashable {
 struct ListItemJoin: Codable, Hashable {
     let save: Save
 }
+
+struct Trip: Codable, Identifiable, Hashable {
+    let id: UUID
+    let userId: UUID
+    let name: String
+    let destination: String
+    let emoji: String?
+    // Postgres `date` columns arrive as "yyyy-MM-dd" strings; parsed lazily
+    // rather than relying on the client's timestamp decoding strategy.
+    let startDate: String?
+    let endDate: String?
+    let createdAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userId = "user_id"
+        case name
+        case destination
+        case emoji
+        case startDate = "start_date"
+        case endDate = "end_date"
+        case createdAt = "created_at"
+    }
+
+    static let dayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        return formatter
+    }()
+
+    var startDateValue: Date? { startDate.flatMap { Self.dayFormatter.date(from: $0) } }
+    var endDateValue: Date? { endDate.flatMap { Self.dayFormatter.date(from: $0) } }
+
+    /// Number of itinerary days; defaults to 3 when no dates are set.
+    var dayCount: Int {
+        guard let start = startDateValue, let end = endDateValue else { return 3 }
+        let days = Calendar.current.dateComponents([.day], from: start, to: end).day ?? 0
+        return min(max(days + 1, 1), 14)
+    }
+
+    func date(forDay day: Int) -> Date? {
+        guard let start = startDateValue else { return nil }
+        return Calendar.current.date(byAdding: .day, value: day - 1, to: start)
+    }
+
+    var daysUntilStart: Int? {
+        guard let start = startDateValue else { return nil }
+        let days = Calendar.current.dateComponents(
+            [.day],
+            from: Calendar.current.startOfDay(for: .now),
+            to: start
+        ).day
+        return days.flatMap { $0 >= 0 ? $0 : nil }
+    }
+}
+
+struct TripItem: Codable, Identifiable, Hashable {
+    let id: UUID
+    let tripId: UUID
+    let dayIndex: Int?
+    let position: Int
+    let note: String?
+    let save: Save
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case tripId = "trip_id"
+        case dayIndex = "day_index"
+        case position
+        case note
+        case save
+    }
+}

@@ -9,6 +9,8 @@ struct MainTabView: View {
                 .tabItem { Label("Saves", systemImage: "square.grid.2x2") }
             MapExploreView()
                 .tabItem { Label("Map", systemImage: "map") }
+            TripsView()
+                .tabItem { Label("Trips", systemImage: "airplane") }
             ListsView()
                 .tabItem { Label("Lists", systemImage: "list.bullet.rectangle") }
             ProfileView()

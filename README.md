@@ -48,12 +48,23 @@ Share Extension ──► Edge Function: process-save
 | Bulk organize | ❌ (requested, missing) | ✅ multi-select → add to list / delete |
 | Fix a wrong location | ❌ | ✅ replace via Apple Maps search |
 | Share a list | ✅ (requires accounts) | ✅ text export via share sheet |
+| Trip planning | ➖ (map only) | ✅ **trips with day-by-day itineraries + AI auto-plan** |
 | Social layer (friends, blends) | ✅ | ➖ future (schema supports it) |
 
 AI extraction can be wrong, so **everything it writes is editable**: open a
 save → ⋯ → Edit to change the title, summary, and category, and to remove,
 replace, or add places. Place corrections go through Apple Maps search, so
 the fixed pin has real coordinates and a real address.
+
+### Trip planner
+
+The Trips tab turns saves into actual travel plans. Create a trip (name,
+destination, optional dates) and either add saves by hand — destination-
+relevant ones sort to the top — or tap **Auto-plan from my saves**: the
+backend picks the saves that belong on this trip and groups them into
+sensible days (same neighborhood together, 2–5 items per day), each with a
+short placement note. Items move between days or back to the Ideas bucket
+with one tap, and every trip has its own map of just its places.
 
 ## Setup
 
@@ -69,6 +80,7 @@ the fixed pin has real coordinates and a real address.
    ```sh
    supabase functions deploy process-save
    supabase functions deploy ask-saves
+   supabase functions deploy plan-trip
    supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
    ```
 4. In Authentication settings, enable Email sign-in (email confirmation

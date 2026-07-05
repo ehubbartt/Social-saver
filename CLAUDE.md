@@ -7,7 +7,7 @@ them on a map, and files the save into lists automatically. Backend is Supabase
 
 ## Layout
 
-- `SocialSaver/` — main app target (tabs: Saves, Map, Lists, Profile)
+- `SocialSaver/` — main app target (tabs: Saves, Map, Trips, Lists, Profile)
 - `ShareExtension/` — share-sheet extension; sends shared URLs to the ingest function
 - `Shared/` — code compiled into both targets (models, Supabase client, repositories, config)
 - `supabase/migrations/` — schema + RLS policies
