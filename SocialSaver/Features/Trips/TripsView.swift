@@ -1,11 +1,17 @@
 import SwiftUI
 
 struct TripsView: View {
+    enum Mode: String, CaseIterable { case trips = "Trips", events = "Events" }
+
     @State private var trips: [Trip] = []
+    @State private var events: [Event] = []
+    @State private var mode: Mode = .trips
     @State private var isLoading = false
     @State private var showingCreate = false
+    @State private var showingCreateEvent = false
 
     private let repository = TripsRepository()
+    private let eventsRepository = EventsRepository()
 
     /// Upcoming (soonest first), then undated, then past trips.
     private var sortedTrips: [Trip] {
@@ -36,9 +42,97 @@ struct TripsView: View {
         return nil
     }
 
+    private var upcomingEvents: [Event] {
+        events.sorted { ($0.dateValue ?? .distantFuture) < ($1.dateValue ?? .distantFuture) }
+    }
+
     var body: some View {
         NavigationStack {
             List {
+                Section {
+                    Picker("View", selection: $mode) {
+                        ForEach(Mode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+                }
+
+                if mode == .events {
+                    eventsContent
+                } else {
+                    tripsContent
+                }
+            }
+            .overlay {
+                if mode == .events && events.isEmpty && !isLoading {
+                    ContentUnavailableView(
+                        "No events yet",
+                        systemImage: "calendar.badge.plus",
+                        description: Text("Plan a single day out and invite friends to it.")
+                    )
+                } else if mode == .trips && trips.isEmpty && !isLoading {
+                    ContentUnavailableView(
+                        "No trips yet",
+                        systemImage: "airplane.departure",
+                        description: Text("Create a trip and plan it from the videos you've saved.")
+                    )
+                }
+            }
+            .navigationTitle(mode.rawValue)
+            .toolbar {
+                Button {
+                    if mode == .events { showingCreateEvent = true } else { showingCreate = true }
+                } label: {
+                    Image(systemName: "plus")
+                }
+            }
+            .refreshable { await refresh() }
+            .task {
+                await refresh()
+                await BriefingScheduler.shared.refresh()
+            }
+            .sheet(isPresented: $showingCreate) {
+                CreateTripSheet { await refresh() }
+            }
+            .sheet(isPresented: $showingCreateEvent) {
+                CreateEventSheet { await refresh() }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var eventsContent: some View {
+        ForEach(upcomingEvents) { event in
+            NavigationLink {
+                EventDetailView(event: event)
+            } label: {
+                eventRow(event)
+            }
+        }
+    }
+
+    private func eventRow(_ event: Event) -> some View {
+        HStack(spacing: 12) {
+            Text(event.emoji ?? "🎉").font(.title2)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(event.title).font(.headline)
+                HStack(spacing: 4) {
+                    Text(event.whenText)
+                    if event.ownerId != SupabaseClientProvider.currentUserId {
+                        Image(systemName: "person.2.fill").foregroundStyle(.tint)
+                    }
+                }
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 2)
+    }
+
+    @ViewBuilder
+    private var tripsContent: some View {
+        Group {
                 if let active = activeTripDay {
                     Section {
                         NavigationLink {
@@ -69,34 +163,6 @@ struct TripsView: View {
                 .onDelete { indexSet in
                     Task { await delete(at: indexSet) }
                 }
-            }
-            .overlay {
-                if trips.isEmpty && !isLoading {
-                    ContentUnavailableView(
-                        "No trips yet",
-                        systemImage: "airplane.departure",
-                        description: Text("Create a trip and plan it from the videos you've saved.")
-                    )
-                }
-            }
-            .navigationTitle("Trips")
-            .toolbar {
-                Button {
-                    showingCreate = true
-                } label: {
-                    Image(systemName: "plus")
-                }
-            }
-            .refreshable { await refresh() }
-            .task {
-                await refresh()
-                await BriefingScheduler.shared.refresh()
-            }
-            .sheet(isPresented: $showingCreate) {
-                CreateTripSheet {
-                    await refresh()
-                }
-            }
         }
     }
 
@@ -131,9 +197,10 @@ struct TripsView: View {
     }
 
     private func refresh() async {
-        isLoading = trips.isEmpty
+        isLoading = trips.isEmpty && events.isEmpty
         defer { isLoading = false }
         trips = (try? await repository.fetchTrips()) ?? trips
+        events = (try? await eventsRepository.events()) ?? events
     }
 
     private func delete(at indexSet: IndexSet) async {

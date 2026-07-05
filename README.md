@@ -52,6 +52,7 @@ Share Extension ──► Edge Function: process-save
 | Quick reviews of places | ✅ | ✅ stars + worth-it verdict + written take |
 | Trip planning | ➖ (map only) | ✅ **trips with day-by-day itineraries + AI auto-plan** |
 | Shared trips | ➖ | ✅ invite friends as viewer/editor |
+| Events (single-day, RSVP) | ➖ | ✅ invite friends, they RSVP, links to places |
 | Trip photos from your camera roll | ➖ | ✅ location+time matched, shared with trip members |
 | Friends + activity feed | ✅ | ✅ opt-in publish model (see below) |
 | Social layer (blends, voting, shared trips) | ✅ | ➖ future (schema supports it) |
@@ -155,6 +156,11 @@ access group, so signing in once in the app is enough.
 Trips can be shared: open a trip → Members → invite an accepted friend as a
 **viewer** (sees the plan) or **editor** (can change it). Shared trips show up
 in each member's Trips tab.
+
+The Trips tab has an **Events** switch for single-day plans: pick a date and
+start time, add stops from your saves (each linking out to the place's map
+and website), invite friends, and they RSVP **going / maybe / can't go**.
+Share the plan as text to anyone via the share sheet.
 
 On a trip, long-press any mapped place → **Add your photos here**. The app
 scans your camera roll for photos taken near that place during the trip and
