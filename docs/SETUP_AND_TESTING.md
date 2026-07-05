@@ -71,8 +71,15 @@ supabase functions deploy ask-saves
 supabase functions deploy plan-trip
 supabase functions deploy trip-agent
 supabase functions deploy discover-videos
+supabase functions deploy get-photo-url
 supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
 ```
+
+The `get-photo-url` function needs the service-role key to sign private
+photo URLs — Supabase injects `SUPABASE_SERVICE_ROLE_KEY` into edge functions
+automatically, so no extra secret. Migration `0015` creates the private
+`trip-photos` storage bucket and its policies; confirm it exists under
+Storage in the dashboard after `db push`.
 `SUPABASE_URL` and `SUPABASE_ANON_KEY` are injected automatically; you only
 set the Anthropic key.
 

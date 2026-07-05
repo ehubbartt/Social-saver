@@ -61,6 +61,10 @@ struct PlaceVideosView: View {
                 }
             }
 
+            Section("Photos") {
+                PhotoGallerySection(placeId: place.id)
+            }
+
             Section("From the community") {
                 if !communityLoaded {
                     ProgressView()

@@ -51,6 +51,8 @@ Share Extension ──► Edge Function: process-save
 | Other videos about a place | ✅ | ✅ community (anonymized) **+ web search** |
 | Quick reviews of places | ✅ | ✅ stars + worth-it verdict + written take |
 | Trip planning | ➖ (map only) | ✅ **trips with day-by-day itineraries + AI auto-plan** |
+| Shared trips | ➖ | ✅ invite friends as viewer/editor |
+| Trip photos from your camera roll | ➖ | ✅ location+time matched, shared with trip members |
 | Friends + activity feed | ✅ | ✅ opt-in publish model (see below) |
 | Social layer (blends, voting, shared trips) | ✅ | ➖ future (schema supports it) |
 
@@ -147,6 +149,20 @@ destination, vacation dates) and build each day's schedule:
 
 The app and the share extension share the auth session through a keychain
 access group, so signing in once in the app is enough.
+
+### Shared trips & trip photos
+
+Trips can be shared: open a trip → Members → invite an accepted friend as a
+**viewer** (sees the plan) or **editor** (can change it). Shared trips show up
+in each member's Trips tab.
+
+On a trip, long-press any mapped place → **Add your photos here**. The app
+scans your camera roll for photos taken near that place during the trip and
+lets you pick which to attach. Privacy: nothing uploads until you choose a
+photo, only the chosen image is uploaded (re-encoded, EXIF/GPS stripped), the
+storage bucket is private, and downloads go through a signed-URL function that
+checks visibility. Attached photos show on the place's Reviews & videos
+screen and are visible to everyone on the trip.
 
 ## How much of the video does it "see"?
 

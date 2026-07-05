@@ -42,6 +42,7 @@ targets:
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         NSLocationWhenInUseUsageDescription: Used to show saved places near you on the map.
+        NSPhotoLibraryUsageDescription: Lets SocialSaver suggest photos you took at the places on your trip so you can add them to your reviews. Photos are only uploaded when you choose to attach them.
         ITSAppUsesNonExemptEncryption: false
   ShareExtension:
     type: app-extension

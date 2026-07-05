@@ -17,7 +17,21 @@ struct TripDetailView: View {
     @State private var showingChat = false
     @State private var showingMembers = false
     @State private var canEdit = true
+    @State private var photoItem: TripItem?
     @State private var errorMessage: String?
+
+    /// Photo matching window: the trip's dates (padded to whole days), or a
+    /// broad fallback when the trip is undated.
+    private var photoWindow: (start: Date, end: Date) {
+        let calendar = Calendar.current
+        if let start = trip.startDateValue, let end = trip.endDateValue {
+            let dayEnd = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: end)) ?? end
+            return (calendar.startOfDay(for: start), dayEnd)
+        }
+        let now = Date.now
+        let twoYearsAgo = calendar.date(byAdding: .year, value: -2, to: now) ?? now
+        return (twoYearsAgo, now)
+    }
 
     private let repository = TripsRepository()
 
@@ -172,6 +186,18 @@ struct TripDetailView: View {
         .sheet(isPresented: $showingMembers) {
             TripMembersSheet(trip: trip, isOwner: isOwner) {
                 await resolveEditRights()
+            }
+        }
+        .sheet(item: $photoItem) { item in
+            if let place = item.mappedPlace {
+                PhotoSuggestionsSheet(
+                    place: place,
+                    tripId: trip.id,
+                    start: photoWindow.start,
+                    end: photoWindow.end
+                ) {
+                    await refresh()
+                }
             }
         }
         .sheet(isPresented: $showingAddSaves) {
@@ -341,6 +367,17 @@ struct TripDetailView: View {
                     SaveDetailView(save: save)
                 }
                 .opacity(0)
+            }
+        }
+        .contextMenu {
+            // Any member can add their own photos of a mapped place — that's
+            // not editing the plan, so it isn't gated by canEdit.
+            if item.mappedPlace != nil {
+                Button {
+                    photoItem = item
+                } label: {
+                    Label("Add your photos here", systemImage: "photo.badge.plus")
+                }
             }
         }
     }

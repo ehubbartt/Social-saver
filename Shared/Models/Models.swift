@@ -347,6 +347,12 @@ struct TripItem: Codable, Identifiable, Hashable {
         return nil
     }
 
+    /// The save's first place that has real coordinates — the anchor for
+    /// photo matching.
+    var mappedPlace: Place? {
+        save?.places.first { $0.latitude != nil && $0.longitude != nil }
+    }
+
     /// Own location for custom entries, else the save's first mapped place.
     var coordinate: CLLocationCoordinate2D? {
         if let latitude, let longitude {
