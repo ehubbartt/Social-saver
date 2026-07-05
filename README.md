@@ -18,9 +18,11 @@ TikTok / Instagram share sheet
 Share Extension ──► Edge Function: process-save
                         │ 1. create pending save (RLS-scoped)
                         │ 2. resolve link metadata (oEmbed / OpenGraph)
-                        │ 3. Claude: classify + summarize + extract places
-                        │    + pick or create the best list
-                        │ 4. geocode places (Nominatim) → map pins
+                        │ 3. download the video's cover frame
+                        │ 4. Claude (vision + caption): classify, summarize,
+                        │    read on-screen text overlays, extract places
+                        │    and recipes, pick or create the best list
+                        │ 5. geocode places (Nominatim) → map pins
                         ▼
                     Postgres (saves, places, lists)
                         ▲
@@ -69,8 +71,26 @@ Share Extension ──► Edge Function: process-save
 The app and the share extension share the auth session through a keychain
 access group, so signing in once in the app is enough.
 
+## How much of the video does it "see"?
+
+The pipeline sends the video's **cover frame** to the model along with the
+caption. That covers most real-world cases: creators usually burn the place
+name, dish, or itinerary text into the cover, and the model reads those
+overlays plus the visible scene. It does **not** download or play the full
+video.
+
+Full video understanding (sampling frames throughout + transcribing the audio)
+would need a worker with `yt-dlp` + `ffmpeg` + a transcription model, since
+video downloads rely on unofficial endpoints and don't fit in an edge
+function's runtime or limits. The extraction schema and prompt are already
+written so that adding "frames + transcript" to the same Claude call is the
+only change needed if you stand up such a worker later.
+
 ## Notes & limitations
 
+- Extraction quality depends on what's publicly visible: caption, hashtags,
+  and the cover frame. A video whose place is only spoken aloud won't be
+  extractable until audio transcription is added (see above).
 - Instagram doesn't offer a public oEmbed endpoint, so metadata comes from
   OpenGraph tags; some links resolve to a login wall and yield thin metadata.
   The pipeline still classifies from the URL and whatever it can read.

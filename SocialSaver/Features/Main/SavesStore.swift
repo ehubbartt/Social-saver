@@ -21,6 +21,21 @@ final class SavesStore {
         }
     }
 
+    /// While any save is still processing, re-fetch every few seconds so the
+    /// grid updates itself when the ingest pipeline finishes.
+    @MainActor
+    func pollWhileProcessing() async {
+        var attempts = 0
+        while attempts < 15, saves.contains(where: { $0.status == .pending }) {
+            try? await Task.sleep(for: .seconds(4))
+            guard !Task.isCancelled else { return }
+            if let fresh = try? await repository.fetchSaves() {
+                saves = fresh
+            }
+            attempts += 1
+        }
+    }
+
     @MainActor
     func delete(_ save: Save) async {
         do {

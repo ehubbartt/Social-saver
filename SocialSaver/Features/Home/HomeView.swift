@@ -34,7 +34,10 @@ struct HomeView: View {
                 SaveDetailView(save: save)
             }
             .refreshable { await store.refresh() }
-            .task { await store.refresh() }
+            .task {
+                await store.refresh()
+                await store.pollWhileProcessing()
+            }
             .overlay { if store.isLoading { ProgressView() } }
         }
     }

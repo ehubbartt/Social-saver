@@ -60,6 +60,11 @@ struct Place: Codable, Identifiable, Hashable {
     }
 }
 
+struct Recipe: Codable, Hashable {
+    let ingredients: [String]
+    let steps: [String]
+}
+
 struct Save: Codable, Identifiable, Hashable {
     let id: UUID
     let userId: UUID
@@ -71,6 +76,7 @@ struct Save: Codable, Identifiable, Hashable {
     let authorName: String?
     let contentType: ContentType
     let status: SaveStatus
+    let recipe: Recipe?
     let createdAt: Date
     let savePlaces: [SavePlaceJoin]?
 
@@ -87,6 +93,7 @@ struct Save: Codable, Identifiable, Hashable {
         case authorName = "author_name"
         case contentType = "content_type"
         case status
+        case recipe
         case createdAt = "created_at"
         case savePlaces = "save_places"
     }

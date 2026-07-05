@@ -2,15 +2,18 @@
 //
 // 1. Create a pending `saves` row for the calling user.
 // 2. Resolve the link's public metadata (oEmbed for TikTok, OpenGraph otherwise).
-// 3. Ask Claude to classify the content, summarize it, extract places, and
-//    pick (or invent) the best list for it, given the user's existing lists.
-// 4. Geocode extracted places via Nominatim and link them to the save.
-// 5. File the save into the chosen list and mark it processed.
+// 3. Download the video's cover frame so the model can SEE the content —
+//    TikTok covers usually carry the place name as a text overlay.
+// 4. Ask Claude (vision + caption) to classify the content, summarize it,
+//    extract places and recipes, and pick the best list for it.
+// 5. Geocode extracted places via Nominatim and link them to the save.
+// 6. File the save into the chosen list and mark it processed (or failed).
 //
 // Secrets required: ANTHROPIC_API_KEY (supabase secrets set ANTHROPIC_API_KEY=...)
 
 import Anthropic from "npm:@anthropic-ai/sdk";
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient, SupabaseClient } from "npm:@supabase/supabase-js@2";
+import { encodeBase64 } from "jsr:@std/encoding/base64";
 
 const EXTRACTION_SCHEMA = {
   type: "object",
@@ -40,6 +43,16 @@ const EXTRACTION_SCHEMA = {
         additionalProperties: false,
       },
     },
+    recipe: {
+      type: ["object", "null"],
+      description: "Only for cooking content: the recipe as far as it can be reconstructed from the caption and cover frame. Null otherwise.",
+      properties: {
+        ingredients: { type: "array", items: { type: "string" } },
+        steps: { type: "array", items: { type: "string" } },
+      },
+      required: ["ingredients", "steps"],
+      additionalProperties: false,
+    },
     list: {
       type: "object",
       description: "Which list this save belongs in.",
@@ -55,7 +68,7 @@ const EXTRACTION_SCHEMA = {
       additionalProperties: false,
     },
   },
-  required: ["content_type", "title", "summary", "places", "list"],
+  required: ["content_type", "title", "summary", "places", "recipe", "list"],
   additionalProperties: false,
 };
 
@@ -64,104 +77,124 @@ interface Extraction {
   title: string;
   summary: string;
   places: { name: string; city: string | null; country: string | null; geocode_query: string }[];
+  recipe: { ingredients: string[]; steps: string[] } | null;
   list: { name: string; emoji: string; is_existing: boolean };
 }
 
 Deno.serve(async (req) => {
+  const { url } = await req.json().catch(() => ({}));
+  if (!url || typeof url !== "string" || !/^https?:\/\//.test(url)) {
+    return json({ error: "A valid 'url' is required" }, 400);
+  }
+
+  // Client scoped to the caller's JWT so all writes go through RLS.
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_ANON_KEY")!,
+    { global: { headers: { Authorization: req.headers.get("Authorization")! } } },
+  );
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError || !userData.user) return json({ error: "Unauthorized" }, 401);
+  const userId = userData.user.id;
+
+  const platform = detectPlatform(url);
+
+  // 1. Create the pending save (idempotent per user+url).
+  const { data: save, error: insertError } = await supabase
+    .from("saves")
+    .upsert(
+      { user_id: userId, source_url: url, source_platform: platform, status: "pending" },
+      { onConflict: "user_id,source_url" },
+    )
+    .select()
+    .single();
+  if (insertError) return json({ error: insertError.message }, 500);
+
   try {
-    const { url } = await req.json();
-    if (!url || typeof url !== "string" || !/^https?:\/\//.test(url)) {
-      return json({ error: "A valid 'url' is required" }, 400);
-    }
+    const result = await processSave(supabase, userId, save.id, url, platform);
+    return json({ ok: true, save_id: save.id, ...result });
+  } catch (error) {
+    console.error("process-save failed:", error);
+    await supabase.from("saves").update({ status: "failed" }).eq("id", save.id);
+    return json({ error: String(error), save_id: save.id }, 500);
+  }
+});
 
-    // Client scoped to the caller's JWT so all writes go through RLS.
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: req.headers.get("Authorization")! } } },
-    );
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-    if (userError || !userData.user) return json({ error: "Unauthorized" }, 401);
-    const userId = userData.user.id;
+async function processSave(
+  supabase: SupabaseClient,
+  userId: string,
+  saveId: string,
+  url: string,
+  platform: string,
+): Promise<{ places: number; list: string }> {
+  // 2. Resolve public metadata for the link.
+  const meta = await fetchLinkMetadata(url, platform);
 
-    const platform = detectPlatform(url);
+  // 3. Grab the cover frame so the model can read on-screen text overlays.
+  const coverImage = meta.thumbnailUrl ? await fetchImage(meta.thumbnailUrl) : null;
 
-    // 1. Create the pending save (idempotent per user+url).
-    const { data: save, error: insertError } = await supabase
-      .from("saves")
+  // 4. Classify + extract with Claude, aware of the user's existing lists.
+  const { data: lists } = await supabase.from("lists").select("id, name, emoji");
+  const extraction = await extractWithClaude(url, platform, meta, coverImage, lists ?? []);
+
+  // 5. Geocode and link places.
+  const placeIds: string[] = [];
+  for (const place of extraction.places.slice(0, 5)) {
+    const geo = await geocode(place.geocode_query);
+    const { data: placeRow } = await supabase
+      .from("places")
       .upsert(
-        { user_id: userId, source_url: url, source_platform: platform, status: "pending" },
-        { onConflict: "user_id,source_url" },
-      )
-      .select()
-      .single();
-    if (insertError) return json({ error: insertError.message }, 500);
-
-    // 2. Resolve public metadata for the link.
-    const meta = await fetchLinkMetadata(url, platform);
-
-    // 3. Classify + extract with Claude, aware of the user's existing lists.
-    const { data: lists } = await supabase.from("lists").select("id, name, emoji");
-    const extraction = await extractWithClaude(url, platform, meta, lists ?? []);
-
-    // 4. Geocode and link places.
-    const placeIds: string[] = [];
-    for (const place of extraction.places.slice(0, 5)) {
-      const geo = await geocode(place.geocode_query);
-      const { data: placeRow } = await supabase
-        .from("places")
-        .upsert(
-          {
-            name: place.name,
-            city: place.city,
-            country: place.country,
-            address: geo?.display_name ?? null,
-            latitude: geo?.lat ?? null,
-            longitude: geo?.lon ?? null,
-          },
-          { onConflict: "name,city,country" },
-        )
-        .select("id")
-        .single();
-      if (placeRow) placeIds.push(placeRow.id);
-    }
-    if (placeIds.length > 0) {
-      await supabase
-        .from("save_places")
-        .upsert(placeIds.map((placeId) => ({ save_id: save.id, place_id: placeId })));
-    }
-
-    // 5. File into the chosen list (create it if new) and finalize the save.
-    const { data: listRow } = await supabase
-      .from("lists")
-      .upsert(
-        { user_id: userId, name: extraction.list.name, emoji: extraction.list.emoji },
-        { onConflict: "user_id,name", ignoreDuplicates: false },
+        {
+          name: place.name,
+          city: place.city,
+          country: place.country,
+          address: geo?.display_name ?? null,
+          latitude: geo?.lat ?? null,
+          longitude: geo?.lon ?? null,
+        },
+        { onConflict: "name,city,country" },
       )
       .select("id")
       .single();
-    if (listRow) {
-      await supabase.from("list_items").upsert({ list_id: listRow.id, save_id: save.id });
-    }
-
-    await supabase
-      .from("saves")
-      .update({
-        title: extraction.title || meta.title || null,
-        summary: extraction.summary || null,
-        thumbnail_url: meta.thumbnailUrl,
-        author_name: meta.authorName,
-        content_type: extraction.content_type,
-        status: "processed",
-      })
-      .eq("id", save.id);
-
-    return json({ ok: true, save_id: save.id, places: placeIds.length, list: extraction.list.name });
-  } catch (error) {
-    console.error("process-save failed:", error);
-    return json({ error: String(error) }, 500);
+    if (placeRow) placeIds.push(placeRow.id);
   }
-});
+  if (placeIds.length > 0) {
+    await supabase
+      .from("save_places")
+      .upsert(placeIds.map((placeId) => ({ save_id: saveId, place_id: placeId })));
+  }
+
+  // 6. File into the chosen list (create it if new) and finalize the save.
+  const { data: listRow } = await supabase
+    .from("lists")
+    .upsert(
+      { user_id: userId, name: extraction.list.name, emoji: extraction.list.emoji },
+      { onConflict: "user_id,name", ignoreDuplicates: false },
+    )
+    .select("id")
+    .single();
+  if (listRow) {
+    await supabase.from("list_items").upsert({ list_id: listRow.id, save_id: saveId });
+  }
+
+  const hasRecipe = extraction.recipe &&
+    (extraction.recipe.ingredients.length > 0 || extraction.recipe.steps.length > 0);
+
+  await supabase
+    .from("saves")
+    .update({
+      title: extraction.title || meta.title || null,
+      summary: extraction.summary || null,
+      thumbnail_url: meta.thumbnailUrl,
+      author_name: meta.authorName,
+      content_type: extraction.content_type,
+      recipe: hasRecipe ? extraction.recipe : null,
+      status: "processed",
+    })
+    .eq("id", saveId);
+
+  return { places: placeIds.length, list: extraction.list.name };
+}
 
 function detectPlatform(url: string): string {
   if (/tiktok\.com/.test(url)) return "tiktok";
@@ -233,10 +266,39 @@ function decodeHtml(text: string): string {
     .replaceAll("&#39;", "'");
 }
 
+type ImageMediaType = "image/jpeg" | "image/png" | "image/webp" | "image/gif";
+
+interface CoverImage {
+  mediaType: ImageMediaType;
+  base64: string;
+}
+
+/// Downloads the cover frame and base64-encodes it for the vision request.
+/// Downloading here (instead of passing the URL through) keeps signed,
+/// short-lived CDN URLs working and lets us skip oversized or non-image files.
+async function fetchImage(url: string): Promise<CoverImage | null> {
+  try {
+    const res = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; SocialSaverBot/1.0)" },
+      redirect: "follow",
+    });
+    if (!res.ok) return null;
+    const contentType = res.headers.get("content-type")?.split(";")[0].trim();
+    const allowed: ImageMediaType[] = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    if (!contentType || !allowed.includes(contentType as ImageMediaType)) return null;
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    if (bytes.byteLength === 0 || bytes.byteLength > 4_500_000) return null;
+    return { mediaType: contentType as ImageMediaType, base64: encodeBase64(bytes) };
+  } catch (_) {
+    return null;
+  }
+}
+
 async function extractWithClaude(
   url: string,
   platform: string,
   meta: LinkMetadata,
+  coverImage: CoverImage | null,
   lists: { name: string; emoji: string | null }[],
 ): Promise<Extraction> {
   const anthropic = new Anthropic({ apiKey: Deno.env.get("ANTHROPIC_API_KEY") });
@@ -245,35 +307,49 @@ async function extractWithClaude(
     ? lists.map((l) => `- ${l.name}`).join("\n")
     : "(the user has no lists yet)";
 
+  const prompt = [
+    `A user shared this ${platform} link to their save-for-later app:`,
+    `URL: ${url}`,
+    `Title/caption: ${meta.title ?? "(unavailable)"}`,
+    `Description: ${meta.description ?? "(unavailable)"}`,
+    `Author: ${meta.authorName ?? "(unknown)"}`,
+    coverImage
+      ? "The video's cover frame is attached. Read any on-screen text overlays" +
+        " carefully — creators usually burn the place name, dish, or key info" +
+        " into the cover — and use what you can see in the scene itself."
+      : "No cover frame was available; work from the caption and URL alone.",
+    "",
+    "Classify the content, write a short title and summary, and extract every",
+    "specific physical place mentioned or shown (restaurants, bars, viewpoints,",
+    "shops, landmarks). Only extract places you are confident about from the",
+    "caption or the image — do not invent places. Captions often contain",
+    "hashtags and location hints; use them.",
+    "",
+    "If this is cooking content, reconstruct the recipe (ingredients and steps)",
+    "as far as the caption and cover frame allow; otherwise set recipe to null.",
+    "",
+    "The user's existing lists:",
+    listNames,
+    "",
+    "Pick the existing list that best fits this save, or propose a concise new",
+    "one if nothing fits.",
+  ].join("\n");
+
+  const content: Anthropic.ContentBlockParam[] = [];
+  if (coverImage) {
+    content.push({
+      type: "image",
+      source: { type: "base64", media_type: coverImage.mediaType, data: coverImage.base64 },
+    });
+  }
+  content.push({ type: "text", text: prompt });
+
   const response = await anthropic.messages.create({
     model: "claude-opus-4-8",
     max_tokens: 2048,
     thinking: { type: "adaptive" },
     output_config: { format: { type: "json_schema", schema: EXTRACTION_SCHEMA } },
-    messages: [
-      {
-        role: "user",
-        content: [
-          `A user shared this ${platform} link to their save-for-later app:`,
-          `URL: ${url}`,
-          `Title/caption: ${meta.title ?? "(unavailable)"}`,
-          `Description: ${meta.description ?? "(unavailable)"}`,
-          `Author: ${meta.authorName ?? "(unknown)"}`,
-          "",
-          "Classify the content, write a short title and summary, and extract",
-          "every specific physical place mentioned (restaurants, bars, viewpoints,",
-          "shops, landmarks). Only extract places you are confident about from the",
-          "caption — do not invent places. Captions often contain hashtags and",
-          "location hints; use them.",
-          "",
-          "The user's existing lists:",
-          listNames,
-          "",
-          "Pick the existing list that best fits this save, or propose a concise",
-          "new one if nothing fits.",
-        ].join("\n"),
-      },
-    ],
+    messages: [{ role: "user", content }],
   });
 
   const text = response.content.find((block) => block.type === "text");
