@@ -117,7 +117,14 @@ struct AskView: View {
         defer { isAsking = false }
         do {
             let response = try await repository.ask(question: asked)
-            let matched = store.saves.filter { response.saveIds.contains($0.id) }
+            // Preserve the model's best-first ordering and drop duplicates.
+            let byId = Dictionary(uniqueKeysWithValues: store.saves.map { ($0.id, $0) })
+            var seen = Set<UUID>()
+            let matched = response.saveIds.compactMap { id -> Save? in
+                guard !seen.contains(id), let save = byId[id] else { return nil }
+                seen.insert(id)
+                return save
+            }
             exchanges.append(Exchange(question: asked, answer: response.answer, saves: matched))
         } catch {
             errorMessage = "Couldn't get an answer. Try again."

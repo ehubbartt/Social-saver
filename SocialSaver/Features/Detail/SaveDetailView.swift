@@ -114,7 +114,11 @@ struct SaveDetailView: View {
         .task {
             lists = (try? await listsRepository.fetchLists()) ?? []
         }
-        .sheet(isPresented: $showingEdit) {
+        .sheet(isPresented: $showingEdit, onDismiss: {
+            // Place edits apply immediately inside the sheet, so refresh even
+            // when the user cancels instead of tapping Save.
+            Task { await reload() }
+        }) {
             EditSaveView(save: save) {
                 await reload()
             }
