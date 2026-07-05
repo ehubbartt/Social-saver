@@ -54,6 +54,16 @@ struct PlaceSheetView: View {
                     } label: {
                         Label("Open in Maps", systemImage: "arrow.triangle.turn.up.right.circle")
                     }
+                    if let website = pin.place.websiteURL {
+                        Link(destination: website) {
+                            Label("Website", systemImage: "globe")
+                        }
+                    }
+                    if let phone = pin.place.phoneURL {
+                        Link(destination: phone) {
+                            Label("Call", systemImage: "phone")
+                        }
+                    }
                 }
                 Section("Saved from") {
                     ForEach(pin.saves) { save in

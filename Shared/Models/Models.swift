@@ -54,10 +54,55 @@ struct Place: Codable, Identifiable, Hashable {
     let country: String?
     let latitude: Double?
     let longitude: Double?
+    let website: String?
+    let phone: String?
 
     var subtitle: String {
         [city, country].compactMap { $0 }.joined(separator: ", ")
     }
+
+    var websiteURL: URL? {
+        website.flatMap(URL.init)
+    }
+
+    var phoneURL: URL? {
+        guard let phone else { return nil }
+        let digits = phone.filter { $0.isNumber || $0 == "+" }
+        return digits.isEmpty ? nil : URL(string: "tel:\(digits)")
+    }
+}
+
+enum LinkKind: String, Codable {
+    case app
+    case product
+    case booking
+    case social
+    case website
+    case other
+
+    init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = LinkKind(rawValue: raw) ?? .other
+    }
+
+    var systemImage: String {
+        switch self {
+        case .app: return "apps.iphone"
+        case .product: return "tag"
+        case .booking: return "calendar.badge.checkmark"
+        case .social: return "at"
+        case .website: return "globe"
+        case .other: return "link"
+        }
+    }
+}
+
+struct SaveLink: Codable, Identifiable, Hashable {
+    let id: UUID
+    let title: String
+    let url: String
+    let kind: LinkKind
+    let note: String?
 }
 
 struct Recipe: Codable, Hashable {
@@ -79,8 +124,10 @@ struct Save: Codable, Identifiable, Hashable {
     let recipe: Recipe?
     let createdAt: Date
     let savePlaces: [SavePlaceJoin]?
+    let saveLinks: [SaveLink]?
 
     var places: [Place] { savePlaces?.map(\.place) ?? [] }
+    var links: [SaveLink] { saveLinks ?? [] }
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -96,6 +143,7 @@ struct Save: Codable, Identifiable, Hashable {
         case recipe
         case createdAt = "created_at"
         case savePlaces = "save_places"
+        case saveLinks = "save_links"
     }
 }
 

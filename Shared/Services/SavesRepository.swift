@@ -4,7 +4,7 @@ import Supabase
 struct SavesRepository {
     private var client: SupabaseClient { SupabaseClientProvider.shared }
 
-    private static let saveColumns = "*, save_places(place:places(*))"
+    private static let saveColumns = "*, save_places(place:places(*)), save_links(*)"
 
     func fetchSaves() async throws -> [Save] {
         try await client
@@ -55,7 +55,7 @@ struct ListsRepository {
     func fetchItems(listId: UUID) async throws -> [Save] {
         let joins: [ListItemJoin] = try await client
             .from("list_items")
-            .select("save:saves(*, save_places(place:places(*)))")
+            .select("save:saves(*, save_places(place:places(*)), save_links(*))")
             .eq("list_id", value: listId)
             .execute()
             .value

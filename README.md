@@ -19,9 +19,11 @@ Share Extension ──► Edge Function: process-save
                         │ 1. create pending save (RLS-scoped)
                         │ 2. resolve link metadata (oEmbed / OpenGraph)
                         │ 3. download the video's cover frame
-                        │ 4. Claude (vision + caption): classify, summarize,
-                        │    read on-screen text overlays, extract places
-                        │    and recipes, pick or create the best list
+                        │ 4. Claude (vision + caption + web search): classify,
+                        │    summarize, read on-screen text overlays, extract
+                        │    places and recipes, look up real links (websites,
+                        │    phone numbers, App Store pages, booking pages),
+                        │    pick or create the best list
                         │ 5. geocode places (Nominatim) → map pins
                         ▼
                     Postgres (saves, places, lists)
@@ -88,6 +90,9 @@ only change needed if you stand up such a worker later.
 
 ## Notes & limitations
 
+- Link finding uses the Claude API's server-side web search tool, so URLs and
+  phone numbers come from actual search results, never model guesses. Web
+  search is billed per use on your API key (a few searches per save at most).
 - Extraction quality depends on what's publicly visible: caption, hashtags,
   and the cover frame. A video whose place is only spoken aloud won't be
   extractable until audio transcription is added (see above).

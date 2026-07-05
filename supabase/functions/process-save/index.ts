@@ -38,8 +38,31 @@ const EXTRACTION_SCHEMA = {
             type: "string",
             description: "Best single-line search query to geocode this place, e.g. 'Katz's Delicatessen, New York, USA'",
           },
+          website: {
+            type: ["string", "null"],
+            description: "Official website URL found via web search. Null if not found.",
+          },
+          phone: {
+            type: ["string", "null"],
+            description: "Phone number found via web search. Null if not found.",
+          },
         },
-        required: ["name", "city", "country", "geocode_query"],
+        required: ["name", "city", "country", "geocode_query", "website", "phone"],
+        additionalProperties: false,
+      },
+    },
+    links: {
+      type: "array",
+      description: "Links for everything else mentioned or recommended: apps, products, booking pages, official sites, tour operators. Only links actually found via web search or present in the caption. Empty if none.",
+      items: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "What the link is, e.g. 'Flighty on the App Store'" },
+          url: { type: "string" },
+          kind: { type: "string", enum: ["app", "product", "booking", "social", "website", "other"] },
+          note: { type: ["string", "null"], description: "One-line note, e.g. why it was recommended" },
+        },
+        required: ["title", "url", "kind", "note"],
         additionalProperties: false,
       },
     },
@@ -68,15 +91,32 @@ const EXTRACTION_SCHEMA = {
       additionalProperties: false,
     },
   },
-  required: ["content_type", "title", "summary", "places", "recipe", "list"],
+  required: ["content_type", "title", "summary", "places", "links", "recipe", "list"],
   additionalProperties: false,
 };
+
+interface ExtractedPlace {
+  name: string;
+  city: string | null;
+  country: string | null;
+  geocode_query: string;
+  website: string | null;
+  phone: string | null;
+}
+
+interface ExtractedLink {
+  title: string;
+  url: string;
+  kind: "app" | "product" | "booking" | "social" | "website" | "other";
+  note: string | null;
+}
 
 interface Extraction {
   content_type: string;
   title: string;
   summary: string;
-  places: { name: string; city: string | null; country: string | null; geocode_query: string }[];
+  places: ExtractedPlace[];
+  links: ExtractedLink[];
   recipe: { ingredients: string[]; steps: string[] } | null;
   list: { name: string; emoji: string; is_existing: boolean };
 }
@@ -151,6 +191,8 @@ async function processSave(
           address: geo?.display_name ?? null,
           latitude: geo?.lat ?? null,
           longitude: geo?.lon ?? null,
+          website: validUrl(place.website),
+          phone: place.phone,
         },
         { onConflict: "name,city,country" },
       )
@@ -162,6 +204,23 @@ async function processSave(
     await supabase
       .from("save_places")
       .upsert(placeIds.map((placeId) => ({ save_id: saveId, place_id: placeId })));
+  }
+
+  // Replace this save's links with the freshly extracted set (idempotent
+  // for re-shares of the same URL).
+  await supabase.from("save_links").delete().eq("save_id", saveId);
+  const links = extraction.links
+    .filter((link) => validUrl(link.url))
+    .slice(0, 8)
+    .map((link) => ({
+      save_id: saveId,
+      title: link.title,
+      url: link.url,
+      kind: link.kind,
+      note: link.note,
+    }));
+  if (links.length > 0) {
+    await supabase.from("save_links").insert(links);
   }
 
   // 6. File into the chosen list (create it if new) and finalize the save.
@@ -328,6 +387,15 @@ async function extractWithClaude(
     "If this is cooking content, reconstruct the recipe (ingredients and steps)",
     "as far as the caption and cover frame allow; otherwise set recipe to null.",
     "",
+    "Use web search to find real links and contact info for what's mentioned:",
+    "- each place's official website and phone number",
+    "- App Store pages for any app recommended",
+    "- official product pages for products or gear",
+    "- booking/reservation pages for tours, hotels, or hard-to-book restaurants",
+    "Only include a URL you found in search results or in the caption itself.",
+    "Never construct or guess a URL — if you can't find it, use null (for place",
+    "contact info) or leave it out of links.",
+    "",
     "The user's existing lists:",
     listNames,
     "",
@@ -344,19 +412,47 @@ async function extractWithClaude(
   }
   content.push({ type: "text", text: prompt });
 
-  const response = await anthropic.messages.create({
+  const request = {
     model: "claude-opus-4-8",
-    max_tokens: 2048,
-    thinking: { type: "adaptive" },
-    output_config: { format: { type: "json_schema", schema: EXTRACTION_SCHEMA } },
-    messages: [{ role: "user", content }],
-  });
+    max_tokens: 4096,
+    thinking: { type: "adaptive" as const },
+    output_config: { format: { type: "json_schema" as const, schema: EXTRACTION_SCHEMA } },
+    tools: [{ type: "web_search_20260209" as const, name: "web_search" as const, max_uses: 6 }],
+  };
 
-  const text = response.content.find((block) => block.type === "text");
+  let messages: Anthropic.MessageParam[] = [{ role: "user", content }];
+  let response = await anthropic.messages.create({ ...request, messages });
+
+  // Server-side web search can pause the turn at its iteration limit;
+  // re-send with the assistant turn appended and it resumes automatically.
+  let continuations = 0;
+  while (response.stop_reason === "pause_turn" && continuations < 3) {
+    messages = [
+      ...messages,
+      { role: "assistant", content: response.content as Anthropic.ContentBlockParam[] },
+    ];
+    response = await anthropic.messages.create({ ...request, messages });
+    continuations++;
+  }
+
+  // With server tools the content interleaves search blocks and text; the
+  // schema-constrained JSON is the final text block.
+  const textBlocks = response.content.filter((block) => block.type === "text");
+  const text = textBlocks[textBlocks.length - 1];
   if (!text || text.type !== "text") {
     throw new Error(`No text in model response (stop_reason: ${response.stop_reason})`);
   }
   return JSON.parse(text.text) as Extraction;
+}
+
+function validUrl(url: string | null): string | null {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? url : null;
+  } catch (_) {
+    return null;
+  }
 }
 
 interface GeocodeResult {

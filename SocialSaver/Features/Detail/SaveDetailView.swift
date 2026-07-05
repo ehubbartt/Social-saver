@@ -58,6 +58,14 @@ struct SaveDetailView: View {
                 }
             }
 
+            if !save.links.isEmpty {
+                Section("Mentioned") {
+                    ForEach(save.links) { link in
+                        linkRow(link)
+                    }
+                }
+            }
+
             Section {
                 Button {
                     if let url = URL(string: save.sourceUrl) { openURL(url) }
@@ -149,8 +157,60 @@ struct SaveDetailView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 .allowsHitTesting(false)
             }
+            contactButtons(for: place)
         }
         .padding(.vertical, 4)
+    }
+
+    @ViewBuilder
+    private func contactButtons(for place: Place) -> some View {
+        if place.websiteURL != nil || place.phoneURL != nil {
+            HStack(spacing: 12) {
+                if let website = place.websiteURL {
+                    Button {
+                        openURL(website)
+                    } label: {
+                        Label("Website", systemImage: "globe")
+                    }
+                }
+                if let phone = place.phoneURL {
+                    Button {
+                        openURL(phone)
+                    } label: {
+                        Label("Call", systemImage: "phone")
+                    }
+                }
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .font(.footnote)
+        }
+    }
+
+    private func linkRow(_ link: SaveLink) -> some View {
+        Button {
+            if let url = URL(string: link.url) { openURL(url) }
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: link.kind.systemImage)
+                    .frame(width: 26)
+                    .foregroundStyle(.tint)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(link.title)
+                        .foregroundStyle(.primary)
+                    if let note = link.note, !note.isEmpty {
+                        Text(note)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+                }
+                Spacer()
+                Image(systemName: "arrow.up.right")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+        }
     }
 
     private struct IngredientLabelStyle: LabelStyle {
