@@ -183,3 +183,68 @@ struct PlanTripResponse: Codable {
     let planned: Int
     let summary: String
 }
+
+struct TripMember: Codable, Identifiable, Hashable {
+    let userId: UUID
+    let role: String
+    let profile: FriendProfile?
+
+    var id: UUID { userId }
+    var isEditor: Bool { role == "editor" }
+
+    enum CodingKeys: String, CodingKey {
+        case userId = "user_id"
+        case role
+        case profile
+    }
+}
+
+extension TripsRepository {
+    /// Trips grow member access via RLS, so distinguish mine from shared.
+    func isOwner(_ trip: Trip) -> Bool {
+        trip.userId == SupabaseClientProvider.currentUserId
+    }
+
+    func members(tripId: UUID) async throws -> [TripMember] {
+        try await client
+            .from("trip_members")
+            .select("user_id, role, profile:profiles(id, username, sharing_paused)")
+            .eq("trip_id", value: tripId)
+            .execute()
+            .value
+    }
+
+    func addMember(tripId: UUID, userId: UUID, role: String) async throws {
+        guard let me = SupabaseClientProvider.currentUserId else { throw AuthError.sessionMissing }
+        struct NewMember: Encodable {
+            let trip_id: UUID
+            let user_id: UUID
+            let role: String
+            let invited_by: UUID
+        }
+        try await client.from("trip_members")
+            .upsert(NewMember(trip_id: tripId, user_id: userId, role: role, invited_by: me), onConflict: "trip_id,user_id")
+            .execute()
+    }
+
+    func setMemberRole(tripId: UUID, userId: UUID, role: String) async throws {
+        try await client.from("trip_members")
+            .update(["role": role])
+            .eq("trip_id", value: tripId)
+            .eq("user_id", value: userId)
+            .execute()
+    }
+
+    func removeMember(tripId: UUID, userId: UUID) async throws {
+        try await client.from("trip_members")
+            .delete()
+            .eq("trip_id", value: tripId)
+            .eq("user_id", value: userId)
+            .execute()
+    }
+
+    func leaveTrip(tripId: UUID) async throws {
+        guard let me = SupabaseClientProvider.currentUserId else { throw AuthError.sessionMissing }
+        try await removeMember(tripId: tripId, userId: me)
+    }
+}

@@ -107,9 +107,16 @@ struct TripsView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(trip.name)
                     .font(.headline)
-                Text(trip.destination)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 4) {
+                    Text(trip.destination)
+                    if trip.userId != SupabaseClientProvider.currentUserId {
+                        Label("Shared", systemImage: "person.2.fill")
+                            .labelStyle(.iconOnly)
+                            .foregroundStyle(.tint)
+                    }
+                }
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
             }
             Spacer()
             if let days = trip.daysUntilStart {

@@ -15,9 +15,13 @@ struct TripDetailView: View {
     @State private var routeDay: DayRef?
     @State private var showingMap = false
     @State private var showingChat = false
+    @State private var showingMembers = false
+    @State private var canEdit = true
     @State private var errorMessage: String?
 
     private let repository = TripsRepository()
+
+    private var isOwner: Bool { repository.isOwner(trip) }
 
     struct DayRef: Identifiable {
         let day: Int
@@ -99,6 +103,11 @@ struct TripDetailView: View {
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Button {
+                    showingMembers = true
+                } label: {
+                    Image(systemName: "person.2")
+                }
+                Button {
                     showingChat = true
                 } label: {
                     Image(systemName: "bubble.left.and.text.bubble.right")
@@ -109,6 +118,7 @@ struct TripDetailView: View {
                     Image(systemName: "map")
                 }
                 .disabled(pins.isEmpty)
+                if canEdit {
                 Menu {
                     Button {
                         showingAddSaves = true
@@ -139,6 +149,7 @@ struct TripDetailView: View {
                 } label: {
                     Image(systemName: "plus")
                 }
+                }
             }
         }
         .overlay {
@@ -156,6 +167,12 @@ struct TripDetailView: View {
         .task {
             await refresh()
             await store.refresh()
+            await resolveEditRights()
+        }
+        .sheet(isPresented: $showingMembers) {
+            TripMembersSheet(trip: trip, isOwner: isOwner) {
+                await resolveEditRights()
+            }
         }
         .sheet(isPresented: $showingAddSaves) {
             AddSavesToTripSheet(trip: trip, existingSaveIds: Set(items.compactMap(\.save?.id))) {
@@ -291,29 +308,31 @@ struct TripDetailView: View {
 
             Spacer()
 
-            Menu {
-                Button {
-                    timeEditItem = item
-                } label: {
-                    Label(item.startTime == nil ? "Set time…" : "Change time…", systemImage: "clock")
-                }
-                Divider()
-                ForEach(1...trip.dayCount, id: \.self) { day in
-                    Button("Day \(day)") {
-                        Task { await move(item, toDay: day) }
+            if canEdit {
+                Menu {
+                    Button {
+                        timeEditItem = item
+                    } label: {
+                        Label(item.startTime == nil ? "Set time…" : "Change time…", systemImage: "clock")
                     }
-                }
-                Button("Ideas") {
-                    Task { await move(item, toDay: nil) }
-                }
-                Divider()
-                Button(role: .destructive) {
-                    Task { await remove(item) }
+                    Divider()
+                    ForEach(1...trip.dayCount, id: \.self) { day in
+                        Button("Day \(day)") {
+                            Task { await move(item, toDay: day) }
+                        }
+                    }
+                    Button("Ideas") {
+                        Task { await move(item, toDay: nil) }
+                    }
+                    Divider()
+                    Button(role: .destructive) {
+                        Task { await remove(item) }
+                    } label: {
+                        Label("Remove from trip", systemImage: "trash")
+                    }
                 } label: {
-                    Label("Remove from trip", systemImage: "trash")
+                    Image(systemName: "ellipsis.circle")
                 }
-            } label: {
-                Image(systemName: "ellipsis.circle")
             }
         }
         .background {
@@ -339,7 +358,18 @@ struct TripDetailView: View {
 
     // MARK: - Drag & drop
 
+    private func resolveEditRights() async {
+        if isOwner {
+            canEdit = true
+            return
+        }
+        let members = (try? await repository.members(tripId: trip.id)) ?? []
+        let me = SupabaseClientProvider.currentUserId
+        canEdit = members.first { $0.userId == me }?.isEditor ?? false
+    }
+
     private func handleDrop(_ ids: [String], toDay day: Int?, before target: TripItem?) -> Bool {
+        guard canEdit else { return false }
         guard let idString = ids.first,
               let uuid = UUID(uuidString: idString),
               let dragged = items.first(where: { $0.id == uuid })

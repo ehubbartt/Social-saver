@@ -141,15 +141,17 @@ Deno.serve(async (req) => {
     const { data: userData, error: userError } = await supabase.auth.getUser();
     if (userError || !userData.user) return json({ error: "Unauthorized" }, 401);
 
-    // RLS: only the caller's own trip resolves.
+    // RLS lets members read the trip; the agent mutates it, so require edit.
     const { data: trip } = await supabase.from("trips").select().eq("id", trip_id).single();
     if (!trip) return json({ error: "Trip not found" }, 404);
+    const { data: canEdit } = await supabase.rpc("can_edit_trip", { p_trip: trip_id });
+    if (!canEdit) return json({ error: "You don't have edit access to this trip" }, 403);
     const dayCount = computeDayCount(trip.start_date, trip.end_date);
 
     const history = sanitizeMessages(clientMessages);
     if (history.length === 0) return json({ error: "'messages' must end with a user turn" }, 400);
 
-    const system = await buildSystem(supabase, trip, dayCount);
+    const system = await buildSystem(supabase, trip, dayCount, userData.user.id);
     const ctx: Ctx = { supabase, tripId: trip_id, dayCount };
 
     const anthropic = new Anthropic({ apiKey: Deno.env.get("ANTHROPIC_API_KEY") });
@@ -228,7 +230,7 @@ function sanitizeMessages(raw: unknown): Anthropic.MessageParam[] {
   return cleaned;
 }
 
-async function buildSystem(supabase: SupabaseClient, trip: Record<string, unknown>, dayCount: number): Promise<string> {
+async function buildSystem(supabase: SupabaseClient, trip: Record<string, unknown>, dayCount: number, callerId: string): Promise<string> {
   const [{ data: items }, { data: saves }] = await Promise.all([
     supabase
       .from("trip_items")
@@ -239,7 +241,7 @@ async function buildSystem(supabase: SupabaseClient, trip: Record<string, unknow
     supabase
       .from("saves")
       .select("id, title, summary, content_type, save_places(place:places(name, city, country))")
-      .eq("user_id", trip.user_id)
+      .eq("user_id", callerId)
       .eq("status", "processed")
       .order("created_at", { ascending: false })
       .limit(150),

@@ -59,9 +59,11 @@ Deno.serve(async (req) => {
     const { data: userData, error: userError } = await supabase.auth.getUser();
     if (userError || !userData.user) return json({ error: "Unauthorized" }, 401);
 
-    // RLS scopes this to the caller's own trips.
+    // RLS lets members read the trip; editing requires owner/editor.
     const { data: trip } = await supabase.from("trips").select().eq("id", trip_id).single();
     if (!trip) return json({ error: "Trip not found" }, 404);
+    const { data: canEdit } = await supabase.rpc("can_edit_trip", { p_trip: trip_id });
+    if (!canEdit) return json({ error: "You don't have edit access to this trip" }, 403);
 
     const dayCount = computeDayCount(trip.start_date, trip.end_date);
 
